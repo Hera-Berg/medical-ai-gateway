@@ -1,0 +1,11 @@
+.env
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/personal/*.pdf
+!data/personal/synthetic-patient-001.pdf
+*.log
+.DS_Store
