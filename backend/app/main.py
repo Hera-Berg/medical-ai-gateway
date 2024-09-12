@@ -1,8 +1,30 @@
 import os
+from contextlib import asynccontextmanager
 
 import httpx
+from app.config import get_settings
+from app.db.models import CONFIG_ACTIVE_STORAGE_BACKEND, AppConfig
+from app.db.session import AsyncSessionLocal
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = get_settings()
+    async with AsyncSessionLocal() as session:
+        existing = await session.get(AppConfig, CONFIG_ACTIVE_STORAGE_BACKEND)
+        if existing is None:
+            session.add(
+                AppConfig(
+                    key=CONFIG_ACTIVE_STORAGE_BACKEND,
+                    value=settings.active_storage_backend_default,
+                )
+            )
+            await session.commit()
+    yield
+
 
 app = FastAPI(
     title="Medical AI Gateway",
@@ -10,7 +32,8 @@ app = FastAPI(
         "Cost-transparent, data-sovereign, domain-specialised RAG. "
         "DEMO & EDUCATIONAL TOOL — NOT MEDICAL ADVICE."
     ),
-    version="0.1.0-scaffold",
+    version="0.2.0-step2",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -49,6 +72,16 @@ async def ready():
 
     all_ok = all(v == "ok" for v in results.values())
     return {"ready": all_ok, "dependencies": results}
+
+
+@app.get("/config/storage-backend")
+async def get_storage_backend():
+    async with AsyncSessionLocal() as session:
+        row = await session.get(AppConfig, CONFIG_ACTIVE_STORAGE_BACKEND)
+        return {
+            "active_storage_backend": row.value if row else None,
+            "seeded": row is not None,
+        }
 
 
 @app.get("/")

@@ -5,12 +5,14 @@ services:
       - frontend
       - backend
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8090:80"
     restart: unless-stopped
 
   cloudflared:
     image: cloudflare/cloudflared:latest
     command: tunnel --no-autoupdate run
+    profiles:
+      - tunnel
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
@@ -31,10 +33,14 @@ services:
       - QDRANT_NODE_2_URL=http://qdrant-node2:6333
       - RUNPOD_API_KEY=${RUNPOD_API_KEY}
       - ACTIVE_STORAGE_BACKEND_DEFAULT=local
+      - RUN_MIGRATIONS=1
+      - LOCAL_PDF_STORAGE_PATH=/data/pdfs
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       - AWS_REGION=${AWS_REGION:-}
       - S3_BUCKET=${S3_BUCKET:-}
+    volumes:
+      - backend_pdf_data:/data/pdfs
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,3 +89,4 @@ volumes:
   qdrant_node1_data:
   qdrant_node2_data:
   postgres_data:
+  backend_pdf_data:
