@@ -32,7 +32,7 @@ app = FastAPI(
         "Cost-transparent, data-sovereign, domain-specialised RAG. "
         "DEMO & EDUCATIONAL TOOL — NOT MEDICAL ADVICE."
     ),
-    version="0.2.0-step2",
+    version="0.3.0-step4",
     lifespan=lifespan,
 )
 
@@ -43,13 +43,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.routers import admin
+
+app.include_router(admin.router)
+
 
 @app.get("/health")
 async def health():
     return {
         "status": "ok",
         "service": "medical-ai-gateway-backend",
-        "replica": os.getenv("HOSTNAME", "unknown"),  # container id => visible LB
+        "replica": os.getenv("HOSTNAME", "unknown"),
     }
 
 
@@ -67,7 +71,7 @@ async def ready():
                 results[name] = (
                     "ok" if r.status_code == 200 else f"http {r.status_code}"
                 )
-            except Exception as exc:  # noqa: BLE001 — scaffold-level reporting
+            except Exception as exc:
                 results[name] = f"unreachable: {type(exc).__name__}"
 
     all_ok = all(v == "ok" for v in results.values())

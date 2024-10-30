@@ -102,16 +102,12 @@ class Chunk(Base):
     document_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    # The point id used in Qdrant for this chunk's vector.
     qdrant_point_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), default=uuid.uuid4, nullable=False, unique=True
     )
-    chunk_index: Mapped[int] = mapped_column(
-        Integer, nullable=False
-    )  # order within doc
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # Provenance location for the chunk card.
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     section: Mapped[str | None] = mapped_column(String(512), nullable=True)
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -235,8 +231,8 @@ class RetrievedChunk(Base):
         ForeignKey("chunks.id", ondelete="SET NULL"), nullable=True
     )
 
-    rank: Mapped[int] = mapped_column(Integer, nullable=False)  # 0 = most similar
-    similarity_score: Mapped[float] = mapped_column(Float, nullable=False)  # 0..1
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    similarity_score: Mapped[float] = mapped_column(Float, nullable=False)
 
     chunk_text_snapshot: Mapped[str] = mapped_column(Text, nullable=False)
     source_filename: Mapped[str] = mapped_column(String(512), nullable=False)
