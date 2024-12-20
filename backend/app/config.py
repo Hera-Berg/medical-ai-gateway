@@ -19,6 +19,16 @@ class Settings(BaseSettings):
 
     runpod_api_key: str = ""
 
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    embedding_dim: int = 384
+
+    fastembed_cache_dir: str = "/opt/fastembed_cache"
+    embedding_query_prefix: str = "query: "
+    embedding_passage_prefix: str = "passage: "
+
+    chunk_size: int = 800
+    chunk_overlap: int = 120
+
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     aws_region: str = ""

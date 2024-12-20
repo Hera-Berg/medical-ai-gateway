@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+ENV FASTEMBED_CACHE_DIR=/opt/fastembed_cache
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='BAAI/bge-small-en-v1.5', cache_dir='/opt/fastembed_cache')"
+
 COPY app ./app
 COPY alembic.ini ./alembic.ini
 COPY entrypoint.sh ./entrypoint.sh

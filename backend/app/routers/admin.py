@@ -20,5 +20,5 @@ async def storage_stats(db: AsyncSession = Depends(get_db)):
         "total_bytes": stats.total_bytes,
         "disk_usage_percent": stats.disk_usage_percent,
         "estimated_monthly_cost_usd": stats.estimated_monthly_cost_usd,
-        "disk_warning": over_threshold,
+        "disk_warning": over_threshold,  # UI shows the warning when true
     }

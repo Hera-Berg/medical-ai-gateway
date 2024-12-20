@@ -32,7 +32,7 @@ app = FastAPI(
         "Cost-transparent, data-sovereign, domain-specialised RAG. "
         "DEMO & EDUCATIONAL TOOL — NOT MEDICAL ADVICE."
     ),
-    version="0.3.0-step4",
+    version="0.4.0-step5",
     lifespan=lifespan,
 )
 
@@ -43,9 +43,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.routers import admin
+from app.routers import admin, collections, documents
 
 app.include_router(admin.router)
+app.include_router(collections.router)
+app.include_router(documents.router)
 
 
 @app.get("/health")
