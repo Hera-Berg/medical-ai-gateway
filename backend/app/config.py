@@ -21,7 +21,6 @@ class Settings(BaseSettings):
 
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dim: int = 384
-
     fastembed_cache_dir: str = "/opt/fastembed_cache"
     embedding_query_prefix: str = "query: "
     embedding_passage_prefix: str = "passage: "
