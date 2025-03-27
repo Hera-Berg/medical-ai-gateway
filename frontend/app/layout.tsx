@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { display, body } from "./fonts";
 import { DisclaimerBanner } from "@/components/disclaimer-banner";
+import { AppShell } from "@/components/app-shell";
 
 export const metadata: Metadata = {
   title: "Medical AI Gateway",
@@ -14,11 +16,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-neutral-50 text-neutral-900">
-        {/*The disclaimer is STRUCTURAL.*/}
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
+      <body className="min-h-screen font-body">
+        {/*Disclaimer is STRUCTURAL.*/}
         <DisclaimerBanner />
-        <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

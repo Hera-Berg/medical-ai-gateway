@@ -1,73 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Button, Card } from "@/components/ui/primitives";
 
-type Health = { status?: string; replica?: string };
-type Ready = { ready?: boolean; dependencies?: Record<string, string> };
-
-export default function Home() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [ready, setReady] = useState<Ready | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const [h, r] = await Promise.all([
-          fetch("/api/health").then((x) => x.json()),
-          fetch("/api/ready").then((x) => x.json()),
-        ]);
-        setHealth(h);
-        setReady(r);
-      } catch (e) {
-        setError(String(e));
-      }
-    })();
-  }, []);
-
+export default function ChatPage() {
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Medical AI Gateway
-        </h1>
-        <p className="mt-1 text-neutral-600">
-          Cost-transparent · data-sovereign · domain-specialised RAG
+    <div className="space-y-6">
+      <header className="fade-up">
+        <h1 className="font-display text-3xl font-semibold text-ink">Chat</h1>
+        <p className="mt-1 text-ink-soft">
+          Ask questions across your corpora — compare a personal record against
+          published guidelines, with provenance shown for every retrieved
+          passage.
         </p>
       </header>
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-5">
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Scaffold self-check
-        </h2>
-        {error && (
-          <p className="text-sm text-red-600">
-            Backend unreachable: {error} — is the stack up?
-          </p>
-        )}
-        {!error && (
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            <dt className="text-neutral-500">Backend liveness</dt>
-            <dd className="font-mono">{health?.status ?? "…"}</dd>
-            <dt className="text-neutral-500">Serving replica</dt>
-            <dd className="font-mono">{health?.replica ?? "…"}</dd>
-            <dt className="text-neutral-500">Dependencies ready</dt>
-            <dd className="font-mono">{ready ? String(ready.ready) : "…"}</dd>
-            <dt className="text-neutral-500">Qdrant nodes</dt>
-            <dd className="font-mono">
-              {ready?.dependencies
-                ? Object.entries(ready.dependencies)
-                    .map(([k, v]) => `${k}=${v}`)
-                    .join(" · ")
-                : "…"}
-            </dd>
-          </dl>
-        )}
-        <p className="mt-4 text-xs text-neutral-400">
-          Refresh a few times — the serving replica should rotate as Nginx
-          round-robins across backend instances.
+      <Card className="p-8 text-center">
+        <div className="font-display text-xl text-ink">
+          Coming in a later step
+        </div>
+        <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
+          The chat interface — model selection, thinking-depth tiers, the cost
+          panel, and the provenance-rich thinking transparency view — is built
+          once inference is wired up. The retrieval pipeline behind it is
+          already working.
         </p>
-      </section>
+        <div className="mt-5 flex justify-center gap-3">
+          <Link href="/knowledge-base">
+            <Button>Go to Knowledge Base</Button>
+          </Link>
+          <Link href="/rag-inspector">
+            <Button variant="outline">Open RAG Inspector</Button>
+          </Link>
+        </div>
+      </Card>
     </div>
   );
 }
