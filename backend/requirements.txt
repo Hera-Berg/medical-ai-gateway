@@ -9,8 +9,11 @@ alembic==1.13.2
 greenlet==3.0.3
 anyio==4.4.0
 
-pypdf==4.2.0
+pypdfium2==4.30.0
 langchain-text-splitters==0.2.2
 fastembed==0.3.6
 qdrant-client==1.10.1
 python-multipart==0.0.9
+
+scikit-learn==1.5.1
+numpy==1.26.4

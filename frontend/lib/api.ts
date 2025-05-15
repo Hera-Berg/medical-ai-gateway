@@ -90,4 +90,92 @@ export const api = {
       jsonOrThrow<Document>(r),
     );
   },
+
+  inspectorOverview: () =>
+    fetch(`${BASE}/inspector/overview`).then((r) =>
+      jsonOrThrow<InspectorOverview>(r),
+    ),
+
+  inspectorChunks: (collectionId: string) =>
+    fetch(`${BASE}/inspector/collections/${collectionId}/chunks`).then((r) =>
+      jsonOrThrow<InspectorChunks>(r),
+    ),
+
+  inspectorDryRun: (body: {
+    query: string;
+    collection_ids?: string[];
+    limit?: number;
+  }) =>
+    fetch(`${BASE}/inspector/dry-run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => jsonOrThrow<DryRunResult>(r)),
+
+  inspectorScatter: (collectionId: string) =>
+    fetch(`${BASE}/inspector/collections/${collectionId}/scatter`).then((r) =>
+      jsonOrThrow<ScatterResult>(r),
+    ),
 };
+
+export interface InspectorOverview {
+  collections: {
+    id: string;
+    name: string;
+    corpus_type: CorpusType;
+    qdrant_collection: string;
+    chunk_count: number;
+    vector_count: number;
+  }[];
+  global_chunk_count: number;
+  global_vector_count: number;
+}
+
+export interface InspectorChunk {
+  id: string;
+  chunk_index: number;
+  text: string;
+  page_number: number | null;
+  section: string | null;
+  token_count: number | null;
+  vector: number[] | null;
+  vector_dim: number | null;
+}
+
+export interface InspectorChunks {
+  collection: { id: string; name: string; corpus_type: CorpusType };
+  documents: {
+    document_id: string;
+    filename: string;
+    source_version: string | null;
+    chunk_count: number;
+    chunks: InspectorChunk[];
+  }[];
+}
+
+export interface DryRunResult {
+  query: string;
+  results: {
+    text: string;
+    similarity_score: number;
+    similarity_percent: number;
+    source_filename: string;
+    source_corpus_type: CorpusType;
+    source_collection_name: string;
+    source_page: number | null;
+    source_version: string | null;
+  }[];
+}
+
+export interface ScatterResult {
+  collection: { id: string; name: string; corpus_type: CorpusType };
+  method: string;
+  point_count: number;
+  points: {
+    x: number;
+    y: number;
+    text: string;
+    page_number: number | null;
+    filename: string | null;
+  }[];
+}

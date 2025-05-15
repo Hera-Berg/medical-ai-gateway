@@ -81,3 +81,51 @@ class QdrantRAG:
             "shard_number": info.config.params.shard_number,
             "replication_factor": info.config.params.replication_factor,
         }
+
+    async def get_vectors_by_point_ids(
+        self, *, collection: str, point_ids: list[str]
+    ) -> dict[str, list[float]]:
+        if not point_ids:
+            return {}
+        records = await self._client.retrieve(
+            collection_name=collection,
+            ids=point_ids,
+            with_vectors=True,
+            with_payload=False,
+        )
+        out: dict[str, list[float]] = {}
+        for r in records:
+            vec = r.vector
+            if isinstance(vec, dict):
+                vec = next(iter(vec.values()))
+            if vec is not None:
+                out[str(r.id)] = list(vec)
+        return out
+
+    async def scroll_all_points(
+        self, *, collection: str, with_vectors: bool = True, limit: int = 10000
+    ) -> list[dict]:
+        results: list[dict] = []
+        offset = None
+        while len(results) < limit:
+            batch, offset = await self._client.scroll(
+                collection_name=collection,
+                with_vectors=with_vectors,
+                with_payload=True,
+                limit=min(256, limit - len(results)),
+                offset=offset,
+            )
+            for r in batch:
+                vec = r.vector
+                if isinstance(vec, dict):
+                    vec = next(iter(vec.values()))
+                results.append(
+                    {
+                        "id": str(r.id),
+                        "vector": list(vec) if vec else None,
+                        "payload": r.payload or {},
+                    }
+                )
+            if offset is None or not batch:
+                break
+        return results
