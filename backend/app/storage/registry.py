@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.db.models import CONFIG_ACTIVE_STORAGE_BACKEND, AppConfig
+from app.storage.aws import AWSStorageBackend
 from app.storage.base import StorageBackend
 from app.storage.local import LocalStorageBackend
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,3 +36,4 @@ async def get_active_backend(session: AsyncSession) -> StorageBackend:
 
 
 register_backend(LocalStorageBackend.name, LocalStorageBackend)
+register_backend(AWSStorageBackend.name, AWSStorageBackend)

@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     aws_region: str = ""
     s3_bucket: str = ""
 
+    aws_s3_price_per_gb_month: float = 0.023
+    aws_ebs_price_per_gb_month: float = 0.08
+    aws_ebs_mount_paths: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
