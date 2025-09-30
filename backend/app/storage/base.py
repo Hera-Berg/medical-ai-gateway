@@ -19,6 +19,12 @@ class StorageStats:
     estimated_monthly_cost_usd: float
 
 
+@dataclass
+class BackendReadiness:
+    ready: bool
+    detail: str
+
+
 class StorageBackend(abc.ABC):
     name: str = "base"
 
@@ -39,3 +45,6 @@ class StorageBackend(abc.ABC):
     @abc.abstractmethod
     async def get_stats(self) -> StorageStats:
         raise NotImplementedError
+
+    async def check_ready(self) -> "BackendReadiness":
+        return BackendReadiness(ready=True, detail="ready")

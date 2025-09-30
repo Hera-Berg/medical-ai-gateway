@@ -116,7 +116,54 @@ export const api = {
     fetch(`${BASE}/inspector/collections/${collectionId}/scatter`).then((r) =>
       jsonOrThrow<ScatterResult>(r),
     ),
+
+  getStorageSettings: () =>
+    fetch(`${BASE}/settings/storage`).then((r) =>
+      jsonOrThrow<StorageSettings>(r),
+    ),
+
+  storageReadiness: (name: string) =>
+    fetch(`${BASE}/settings/storage/readiness/${name}`).then((r) =>
+      jsonOrThrow<StorageReadiness>(r),
+    ),
+
+  switchStorageBackend: (backend: string, confirm: boolean) =>
+    fetch(`${BASE}/settings/storage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ backend, confirm }),
+    }).then((r) => jsonOrThrow<{ active: string; detail: string }>(r)),
+
+  storageStats: () =>
+    fetch(`${BASE}/admin/storage/stats`).then((r) =>
+      jsonOrThrow<StorageStats>(r),
+    ),
 };
+
+export interface StorageSettings {
+  active: string;
+  options: {
+    name: string;
+    label: string;
+    tagline: string;
+    description: string;
+    requires_config: boolean;
+  }[];
+}
+
+export interface StorageReadiness {
+  name: string;
+  ready: boolean;
+  detail: string;
+}
+
+export interface StorageStats {
+  backend_name: string;
+  total_bytes: number;
+  disk_usage_percent: number | null;
+  estimated_monthly_cost_usd: number;
+  disk_warning: boolean;
+}
 
 export interface InspectorOverview {
   collections: {

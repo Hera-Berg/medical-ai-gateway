@@ -7,7 +7,7 @@ import uuid
 
 import anyio
 from app.config import get_settings
-from app.storage.base import StorageBackend, StorageStats, StoredFile
+from app.storage.base import BackendReadiness, StorageBackend, StorageStats, StoredFile
 
 _SAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]")
 
@@ -118,3 +118,28 @@ class AWSStorageBackend(StorageBackend):
             )
 
         return await anyio.to_thread.run_sync(_compute)
+
+    async def check_ready(self) -> BackendReadiness:
+        if not self._bucket:
+            return BackendReadiness(ready=False, detail="S3_BUCKET is not configured.")
+
+        def _probe() -> BackendReadiness:
+            try:
+                self._get_client().head_bucket(Bucket=self._bucket)
+                return BackendReadiness(
+                    ready=True, detail=f"S3 bucket '{self._bucket}' reachable."
+                )
+            except Exception as exc:
+                msg = type(exc).__name__
+                code = getattr(getattr(exc, "response", None), "get", lambda *_: None)(
+                    "Error", {}
+                )
+                if isinstance(code, dict):
+                    msg = code.get("Code", msg)
+                return BackendReadiness(
+                    ready=False,
+                    detail=f"S3 bucket '{self._bucket}' not reachable ({msg}). "
+                    "Check credentials, region, and bucket name.",
+                )
+
+        return await anyio.to_thread.run_sync(_probe)
