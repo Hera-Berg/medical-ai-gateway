@@ -1,0 +1,26 @@
+default_model: mistral-7b
+
+models:
+  mistral-7b:
+    display_name: "Mistral 7B"
+    endpoint_id: "REPLACE_WITH_RUNPOD_ENDPOINT_ID"
+    gpu_tier: "RTX 4090 24GB"
+    per_second_usd: 0.00031
+    capability_hint: "Fast and cheap — good for simple lookups"
+    context_window: 8192
+
+  llama3-8b:
+    display_name: "Llama 3 8B"
+    endpoint_id: "REPLACE_WITH_RUNPOD_ENDPOINT_ID"
+    gpu_tier: "A100 40GB"
+    per_second_usd: 0.00044
+    capability_hint: "Balanced — solid general clinical reasoning"
+    context_window: 8192
+
+  llama3-70b:
+    display_name: "Llama 3 70B"
+    endpoint_id: "REPLACE_WITH_RUNPOD_ENDPOINT_ID"
+    gpu_tier: "A100 80GB"
+    per_second_usd: 0.00053
+    capability_hint: "Best for complex clinical reasoning — slower, pricier"
+    context_window: 8192
