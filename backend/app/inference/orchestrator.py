@@ -87,17 +87,27 @@ class Orchestrator:
         result = OrchestratorResult(final_answer="")
         seq = 0
         last_output = ""
+        last_items: list[RetrievedItem] = []
 
         for plan in plans:
             items: list[RetrievedItem] = []
             if plan.retrieves:
+
+                retrieval_query = plan.query_transform(question)
                 items = await self._retriever.retrieve(
-                    query_text=question, collections=qdrant_collections, limit=self._k
+                    query_text=retrieval_query,
+                    collections=qdrant_collections,
+                    limit=self._k,
                 )
+                last_items = items
                 result.events.append(
-                    TraceRetrieval(sequence=seq, query_text=question, items=items)
+                    TraceRetrieval(
+                        sequence=seq, query_text=retrieval_query, items=items
+                    )
                 )
                 seq += 1
+            else:
+                items = last_items
 
             prompt = self._build_prompt(
                 role=plan.role,

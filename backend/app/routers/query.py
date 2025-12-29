@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/query", tags=["query"])
 
-_ENABLED_TIERS = {ThinkingTier.low}
+_ENABLED_TIERS = {ThinkingTier.low, ThinkingTier.medium, ThinkingTier.high}
 
 
 @router.get("/models")

@@ -22,7 +22,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [pending, setPending] = useState<string | null>(null); // backend being switched to
+  const [pending, setPending] = useState<string | null>(null);
   const [readiness, setReadiness] = useState<StorageReadiness | null>(null);
   const [checking, setChecking] = useState(false);
   const [switching, setSwitching] = useState(false);
