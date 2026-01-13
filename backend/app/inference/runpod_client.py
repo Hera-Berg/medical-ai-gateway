@@ -65,7 +65,7 @@ class RunPodClient:
             model.gpu_tier, 1200
         )
         execution_ms = base_exec + rng.randint(-200, 600)
-        delay_ms = rng.choice([0, 0, 0, rng.randint(8000, 45000)])  # ~25% cold
+        delay_ms = rng.choice([0, 0, 0, rng.randint(8000, 45000)])
 
         text = (
             f"[MOCK · {model.display_name}] Based on the retrieved context, here is a "

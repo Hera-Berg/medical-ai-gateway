@@ -33,9 +33,8 @@ class Settings(BaseSettings):
     aws_region: str = ""
     s3_bucket: str = ""
 
-    aws_s3_price_per_gb_month: float = 0.023
-    aws_ebs_price_per_gb_month: float = 0.08
-    aws_ebs_mount_paths: str = ""
+    subscription_comparison_usd_month: float = 20.0
+    subscription_comparison_label: str = "$20/mo subscription"
 
 
 @lru_cache

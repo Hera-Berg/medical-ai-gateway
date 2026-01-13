@@ -138,7 +138,70 @@ export const api = {
     fetch(`${BASE}/admin/storage/stats`).then((r) =>
       jsonOrThrow<StorageStats>(r),
     ),
+
+  costSummary: () =>
+    fetch(`${BASE}/costs/summary`).then((r) => jsonOrThrow<CostSummary>(r)),
+  costByModel: () =>
+    fetch(`${BASE}/costs/by-model`).then((r) =>
+      jsonOrThrow<{ by_model: CostByModel[] }>(r),
+    ),
+  costByTier: () =>
+    fetch(`${BASE}/costs/by-tier`).then((r) =>
+      jsonOrThrow<{ by_tier: CostByTier[] }>(r),
+    ),
+  costTimeline: () =>
+    fetch(`${BASE}/costs/timeline`).then((r) =>
+      jsonOrThrow<{ timeline: CostTimelinePoint[] }>(r),
+    ),
+  costRecent: () =>
+    fetch(`${BASE}/costs/recent`).then((r) =>
+      jsonOrThrow<{ recent: CostRecentRow[] }>(r),
+    ),
 };
+
+export interface CostSummary {
+  n_queries: number;
+  total_cost_usd: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  avg_cost_per_query_usd: number;
+  avg_latency_ms: number;
+  total_inference_calls: number;
+  break_even: {
+    subscription_usd_month: number;
+    subscription_label: string;
+    queries_per_month_to_break_even: number | null;
+    explanation: string;
+  };
+}
+export interface CostByModel {
+  model_key: string;
+  n_queries: number;
+  total_cost_usd: number;
+  avg_cost_usd: number;
+}
+export interface CostByTier {
+  tier: string;
+  n_queries: number;
+  total_cost_usd: number;
+  avg_cost_usd: number;
+  avg_inference_calls: number;
+}
+export interface CostTimelinePoint {
+  day: string;
+  n_queries: number;
+  cost_usd: number;
+}
+export interface CostRecentRow {
+  query_id: string;
+  question: string;
+  model_key: string;
+  thinking_tier: string;
+  n_inference_calls: number;
+  total_cost_usd: number;
+  total_latency_ms: number;
+  created_at: string;
+}
 
 export interface StorageSettings {
   active: string;

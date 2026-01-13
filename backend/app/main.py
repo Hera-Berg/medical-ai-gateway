@@ -32,7 +32,7 @@ app = FastAPI(
         "Cost-transparent, data-sovereign, domain-specialised RAG. "
         "DEMO & EDUCATIONAL TOOL — NOT MEDICAL ADVICE."
     ),
-    version="0.7.0-step11",
+    version="0.8.0-step13",
     lifespan=lifespan,
 )
 
@@ -43,10 +43,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.routers import admin, collections, documents, inspector, query, settings
+from app.routers import admin, collections, costs, documents, inspector, query, settings
 
 app.include_router(admin.router)
 app.include_router(collections.router)
+app.include_router(costs.router)
 app.include_router(documents.router)
 app.include_router(inspector.router)
 app.include_router(query.router)

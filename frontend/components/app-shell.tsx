@@ -12,7 +12,11 @@ const NAV: { href: string; label: string; desc: string }[] = [
     desc: "Documents & collections",
   },
   { href: "/rag-inspector", label: "RAG Inspector", desc: "Diagnostic" },
-  { href: "/dashboard", label: "Cost Dashboard", desc: "Spend & break-even" },
+  {
+    href: "/cost-dashboard",
+    label: "Cost Dashboard",
+    desc: "Spend & break-even",
+  },
   { href: "/settings", label: "Settings", desc: "Storage backend" },
   { href: "/admin", label: "Admin", desc: "Cluster & DB stats" },
 ];
