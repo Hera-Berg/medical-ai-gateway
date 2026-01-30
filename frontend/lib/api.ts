@@ -157,7 +157,81 @@ export const api = {
     fetch(`${BASE}/costs/recent`).then((r) =>
       jsonOrThrow<{ recent: CostRecentRow[] }>(r),
     ),
+
+  queryModels: () =>
+    fetch(`${BASE}/query/models`).then((r) =>
+      jsonOrThrow<QueryModelsResponse>(r),
+    ),
+
+  runQuery: (body: {
+    question: string;
+    model_key?: string;
+    thinking_tier: "low" | "medium" | "high";
+    collection_ids?: string[];
+  }) =>
+    fetch(`${BASE}/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => jsonOrThrow<QueryResponse>(r)),
 };
+
+export interface QueryModelsResponse {
+  default: string;
+  models: {
+    key: string;
+    display_name: string;
+    gpu_tier: string;
+    per_second_usd: number;
+    capability_hint: string;
+  }[];
+  tiers: { key: string; multiplier: number; enabled: boolean }[];
+}
+
+export interface TraceChunk {
+  rank: number;
+  text: string;
+  similarity_percent: number;
+  source_filename: string;
+  source_corpus_type: CorpusType;
+  source_page: number | null;
+  source_version: string | null;
+}
+
+export type TraceEventOut =
+  | {
+      type: "retrieval";
+      sequence: number;
+      query_text: string;
+      chunks: TraceChunk[];
+    }
+  | {
+      type: "inference_pass";
+      sequence: number;
+      role: string;
+      label: string;
+      output: string;
+      input_tokens: number;
+      output_tokens: number;
+      cost_usd: number;
+      latency_ms: number;
+    };
+
+export interface QueryResponse {
+  query_id: string;
+  answer: string;
+  model: { key: string; display_name: string; gpu_tier: string };
+  thinking_tier: string;
+  mocked: boolean;
+  trace_events: TraceEventOut[];
+  cost: {
+    n_inference_calls: number;
+    total_input_tokens: number;
+    total_output_tokens: number;
+    total_cost_usd: number;
+    total_latency_ms: number;
+  };
+}
 
 export interface CostSummary {
   n_queries: number;
