@@ -139,6 +139,11 @@ export const api = {
       jsonOrThrow<StorageStats>(r),
     ),
 
+  adminCluster: () =>
+    fetch(`${BASE}/admin/cluster`).then((r) => jsonOrThrow<AdminCluster>(r)),
+  adminDatabase: () =>
+    fetch(`${BASE}/admin/database`).then((r) => jsonOrThrow<AdminDatabase>(r)),
+
   costSummary: () =>
     fetch(`${BASE}/costs/summary`).then((r) => jsonOrThrow<CostSummary>(r)),
   costByModel: () =>
@@ -300,6 +305,36 @@ export interface StorageStats {
   disk_usage_percent: number | null;
   estimated_monthly_cost_usd: number;
   disk_warning: boolean;
+}
+
+export interface AdminCluster {
+  cluster: {
+    status?: string;
+    peer_id?: number;
+    peer_count?: number;
+    peers?: { peer_id: string; uri: string }[];
+  };
+  collections: {
+    name: string;
+    qdrant_collection: string;
+    corpus_type: CorpusType;
+    points_count: number | null;
+    status: string | null;
+    shard_number: number | null;
+    replication_factor: number | null;
+    shards: {
+      peer_id?: number;
+      shard_count?: number;
+      local_shards?: { shard_id: number; state: string; points: number }[];
+      remote_shards?: { shard_id: number; peer_id: number; state: string }[];
+    };
+  }[];
+  caveat: string;
+}
+
+export interface AdminDatabase {
+  row_counts: Record<string, number>;
+  database_size: string | null;
 }
 
 export interface InspectorOverview {
