@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import socket
+
 from app.db.models import Chunk, Collection, Document, Query
 from app.db.session import get_db
 from app.rag.qdrant_client import QdrantRAG
@@ -9,6 +12,14 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.get("/whoami")
+async def whoami():
+    return {
+        "hostname": socket.gethostname(),
+        "pid": os.getpid(),
+    }
 
 
 @router.get("/storage/stats")
