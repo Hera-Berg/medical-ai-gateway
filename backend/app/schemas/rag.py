@@ -1,12 +1,15 @@
+"""Pydantic schemas for the collections + documents API (step 5)."""
 from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
 
-from app.db.models import CorpusType
 from pydantic import BaseModel, ConfigDict
 
+from app.db.models import CorpusType
 
+
+# ── Collections ─────────────────────────────────────────────────────────────
 class CollectionCreate(BaseModel):
     name: str
     corpus_type: CorpusType
@@ -24,6 +27,7 @@ class CollectionOut(BaseModel):
     created_at: datetime
 
 
+# ── Documents ───────────────────────────────────────────────────────────────
 class DocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

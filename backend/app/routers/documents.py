@@ -1,7 +1,26 @@
+"""
+Documents router — upload / list / delete.
+
+Upload drives the full ingestion pipeline via IngestionService, using the
+ACTIVE storage backend (resolved per request from app_config). Delete removes
+the PG rows (cascading to chunks), the stored file, and the Qdrant vectors —
+the three-place cleanup the spec calls for.
+"""
 from __future__ import annotations
 
 import uuid
 from datetime import date
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+)
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Collection, Document
 from app.db.session import get_db
@@ -9,9 +28,6 @@ from app.ingestion.service import IngestionService
 from app.rag.qdrant_client import QdrantRAG
 from app.schemas.rag import DocumentOut
 from app.storage.registry import get_active_backend
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -72,9 +88,11 @@ async def delete_document(document_id: uuid.UUID, db: AsyncSession = Depends(get
     locator = doc.storage_locator
     qdrant_collection = coll.qdrant_collection if coll else None
 
+    # 1. PG rows (chunks cascade via FK).
     await db.delete(doc)
     await db.commit()
 
+    # 2. Qdrant vectors for this document.
     if qdrant_collection:
         try:
             await QdrantRAG().delete_document(
@@ -83,6 +101,7 @@ async def delete_document(document_id: uuid.UUID, db: AsyncSession = Depends(get
         except Exception:
             pass
 
+    # 3. Stored file via the active backend.
     try:
         storage = await get_active_backend(db)
         await storage.delete_file(locator=locator)

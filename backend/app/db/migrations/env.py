@@ -1,16 +1,30 @@
+"""
+Alembic migration environment, configured for async SQLAlchemy.
+
+Key choices:
+  • The DB URL comes from app settings (env-driven), not alembic.ini, so there's
+    one source of truth for credentials.
+  • target_metadata is the app's Base.metadata, so `alembic revision
+    --autogenerate` sees all models in app/db/models.py.
+  • Async engine: we run migrations inside an async connection via asyncio.
+"""
 import asyncio
 from logging.config import fileConfig
 
-import app.db.models
 from alembic import context
-from app.config import get_settings
-from app.db.session import Base
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from app.config import get_settings
+from app.db.session import Base
+
+# Import models so their tables register on Base.metadata for autogenerate.
+import app.db.models  # noqa: F401
+
 config = context.config
 
+# Inject the runtime DB URL.
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 if config.config_file_name is not None:

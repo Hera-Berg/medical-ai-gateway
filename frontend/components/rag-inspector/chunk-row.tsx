@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * ChunkRow — one chunk in the inspector's browse view. Shows index, page, token
+ * count, the text, and the embedding vector truncated to the first 8 dimensions
+ * with a "copy full vector" button (per spec).
+ */
 import { useState } from "react";
 import type { InspectorChunk } from "@/lib/api";
 import { cn } from "@/components/ui/primitives";
@@ -23,9 +28,7 @@ export function ChunkRow({ chunk }: { chunk: InspectorChunk }) {
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2"
       >
-        <span className="font-mono text-xs text-ink-mute">
-          #{chunk.chunk_index}
-        </span>
+        <span className="font-mono text-xs text-ink-mute">#{chunk.chunk_index}</span>
         <span className="min-w-0 flex-1 truncate text-sm text-ink">
           {chunk.text.slice(0, 110)}
           {chunk.text.length > 110 ? "…" : ""}
@@ -34,12 +37,7 @@ export function ChunkRow({ chunk }: { chunk: InspectorChunk }) {
           {chunk.page_number != null && `p.${chunk.page_number} · `}
           {chunk.token_count}t
         </span>
-        <span
-          className={cn(
-            "shrink-0 text-ink-mute transition-transform",
-            open && "rotate-90",
-          )}
-        >
+        <span className={cn("shrink-0 text-ink-mute transition-transform", open && "rotate-90")}>
           ›
         </span>
       </button>

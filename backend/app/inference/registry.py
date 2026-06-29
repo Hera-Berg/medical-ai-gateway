@@ -1,3 +1,7 @@
+"""
+Model registry loader — reads models.yaml into typed descriptors used by the
+inference path, the cost calculator, and the (later) model-selector UI.
+"""
 from __future__ import annotations
 
 import functools
@@ -18,6 +22,8 @@ class ModelDescriptor:
     per_second_usd: float
     capability_hint: str
     context_window: int
+    hf_model_id: str = ""        # HuggingFace id (sent to the OpenAI-compatible worker)
+    deployed: bool = False       # whether a real endpoint is wired (UI can flag)
 
 
 @functools.lru_cache(maxsize=1)
@@ -33,6 +39,8 @@ def _load() -> tuple[dict[str, ModelDescriptor], str]:
             per_second_usd=float(m["per_second_usd"]),
             capability_hint=m["capability_hint"],
             context_window=int(m.get("context_window", 8192)),
+            hf_model_id=m.get("hf_model_id", ""),
+            deployed=not str(m["endpoint_id"]).startswith("REPLACE_"),
         )
     return models, data.get("default_model", next(iter(models)))
 
@@ -46,7 +54,9 @@ def get_model(key: str) -> ModelDescriptor:
     try:
         return models[key]
     except KeyError as exc:
-        raise ValueError(f"Unknown model '{key}'. Available: {sorted(models)}") from exc
+        raise ValueError(
+            f"Unknown model '{key}'. Available: {sorted(models)}"
+        ) from exc
 
 
 def default_model_key() -> str:

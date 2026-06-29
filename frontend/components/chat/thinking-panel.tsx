@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * ThinkingPanel — renders the ordered trace (retrieval + inference passes) for a
+ * chat answer. Collapsed by default so the answer leads; expand to see how it
+ * was reached. Each retrieval event shows the (possibly reframed) query that
+ * pass used and the chunks it pulled, with a subtle corpus badge so the
+ * authoritative-vs-personal provenance is visible across the trust boundary.
+ *
+ * Honest framing: chunk cards say "Retrieved from [source] · NN%" — never
+ * "verified". They show where evidence came from, not that it's correct.
+ */
 import { useState } from "react";
 import type { TraceEventOut } from "@/lib/api";
 import { CorpusBadge } from "@/components/corpus-badge";
@@ -14,6 +24,7 @@ export function ThinkingPanel({
 }) {
   const [open, setOpen] = useState(false);
 
+  // pair each inference pass with the retrieval that preceded it (if any)
   const retrievals = events.filter((e) => e.type === "retrieval");
   const passes = events.filter((e) => e.type === "inference_pass");
 
@@ -30,12 +41,7 @@ export function ThinkingPanel({
             {retrievals.length} retrieval{retrievals.length === 1 ? "" : "s"}
           </span>
         </span>
-        <span
-          className={cn(
-            "text-ink-mute transition-transform",
-            open && "rotate-90",
-          )}
-        >
+        <span className={cn("text-ink-mute transition-transform", open && "rotate-90")}>
           ›
         </span>
       </button>
@@ -47,7 +53,7 @@ export function ThinkingPanel({
               <RetrievalStep key={i} ev={ev} />
             ) : (
               <PassStep key={i} ev={ev} />
-            ),
+            )
           )}
         </div>
       )}

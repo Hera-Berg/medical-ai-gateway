@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * ChatControls — model selector, thinking-tier selector (with cost-multiplier
+ * preview so the depth/cost tradeoff is visible before submitting), and the
+ * collection scope picker. Lifted state: the parent owns the values.
+ */
 import type { QueryModelsResponse } from "@/lib/api";
 import type { Collection } from "@/lib/api";
 import { cn } from "@/components/ui/primitives";
@@ -30,7 +35,7 @@ export function ChatControls({
   selectedTier: string;
   onTier: (k: string) => void;
   collections: Collection[];
-  selectedCollections: string[];
+  selectedCollections: string[]; // empty = all
   onToggleCollection: (id: string) => void;
   disabled: boolean;
 }) {
@@ -53,20 +58,16 @@ export function ChatControls({
                 "rounded border px-3 py-1.5 text-left text-sm transition-colors disabled:opacity-50",
                 m.key === selectedModel
                   ? "border-brand bg-brand-soft text-brand-ink"
-                  : "border-border bg-surface hover:bg-surface-2",
+                  : "border-border bg-surface hover:bg-surface-2"
               )}
             >
               <span className="block font-medium">{m.display_name}</span>
-              <span className="block text-[11px] text-ink-mute">
-                {m.gpu_tier}
-              </span>
+              <span className="block text-[11px] text-ink-mute">{m.gpu_tier}</span>
             </button>
           ))}
         </div>
         {model && (
-          <p className="mt-1.5 text-xs text-ink-mute">
-            {model.capability_hint}
-          </p>
+          <p className="mt-1.5 text-xs text-ink-mute">{model.capability_hint}</p>
         )}
       </div>
 
@@ -87,7 +88,7 @@ export function ChatControls({
                   "rounded border px-3 py-2 text-left transition-colors disabled:opacity-40",
                   t.key === selectedTier
                     ? "border-brand bg-brand-soft text-brand-ink"
-                    : "border-border bg-surface hover:bg-surface-2",
+                    : "border-border bg-surface hover:bg-surface-2"
                 )}
               >
                 <span className="flex items-center justify-between">
@@ -116,11 +117,7 @@ export function ChatControls({
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-mute">
             Corpora{" "}
             <span className="font-normal normal-case text-ink-mute">
-              (
-              {selectedCollections.length === 0
-                ? "all"
-                : selectedCollections.length}{" "}
-              selected)
+              ({selectedCollections.length === 0 ? "all" : selectedCollections.length} selected)
             </span>
           </label>
           <div className="flex flex-wrap gap-2">
@@ -137,7 +134,7 @@ export function ChatControls({
                     "flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs transition-colors disabled:opacity-50",
                     on
                       ? "border-brand bg-brand-soft"
-                      : "border-border bg-surface opacity-50",
+                      : "border-border bg-surface opacity-50"
                   )}
                 >
                   <CorpusBadge type={c.corpus_type} />

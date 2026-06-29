@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Cost Dashboard — aggregates the real QueryCost rows written by every query.
+ *
+ * Centerpiece: the break-even widget, grounded in measured per-query cost vs a
+ * configurable subscription anchor. Everything is TIME-BASED (RunPod per-second
+ * billing), so these numbers reflect how the system actually bills.
+ */
 import { useEffect, useState } from "react";
 import {
   api,
@@ -76,6 +83,25 @@ export default function CostDashboardPage() {
         </Card>
       ) : (
         <>
+          {/* ── simulated-cost honesty banner ── */}
+          {summary.any_mocked && (
+            <div
+              className="rounded-lg border px-4 py-3 text-sm"
+              style={{
+                borderColor: "var(--warn)",
+                background: "var(--warn-soft)",
+                color: "var(--warn)",
+              }}
+            >
+              <strong>
+                {summary.all_mocked ? "Simulated costs." : "Includes simulated costs."}
+              </strong>{" "}
+              {summary.all_mocked
+                ? "All figures below are modelled — inference ran in mock mode (MOCK_INFERENCE=1), so no GPU was billed. These are projected costs at the configured per-second rates, not real spend."
+                : `${summary.n_mocked} of ${summary.n_queries} queries ran in mock mode (no GPU billed). Those rows show modelled cost, not real spend.`}
+            </div>
+          )}
+
           {/* ── summary stats ── */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Total queries" value={String(summary.n_queries)} />
@@ -100,7 +126,7 @@ export default function CostDashboardPage() {
                 <div className="flex items-baseline gap-2">
                   <span className="font-display text-4xl font-semibold text-ink">
                     {Math.round(
-                      summary.break_even.queries_per_month_to_break_even,
+                      summary.break_even.queries_per_month_to_break_even
                     ).toLocaleString()}
                   </span>
                   <span className="text-ink-soft">queries / month</span>
@@ -111,12 +137,12 @@ export default function CostDashboardPage() {
                   query, you could run{" "}
                   <strong>
                     {Math.round(
-                      summary.break_even.queries_per_month_to_break_even,
+                      summary.break_even.queries_per_month_to_break_even
                     ).toLocaleString()}
                   </strong>{" "}
                   queries a month before self-hosting costs as much as the{" "}
-                  {summary.break_even.subscription_label}. Below that,
-                  per-second self-hosting is cheaper.
+                  {summary.break_even.subscription_label}. Below that, per-second
+                  self-hosting is cheaper.
                 </p>
               </>
             ) : (
@@ -134,19 +160,9 @@ export default function CostDashboardPage() {
               </h2>
               <div style={{ width: "100%", height: 260 }}>
                 <ResponsiveContainer>
-                  <LineChart
-                    data={timeline}
-                    margin={{ left: 8, right: 8, top: 8 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="var(--border)"
-                    />
-                    <XAxis
-                      dataKey="day"
-                      tick={{ fontSize: 11 }}
-                      stroke="var(--ink-mute)"
-                    />
+                  <LineChart data={timeline} margin={{ left: 8, right: 8, top: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="var(--ink-mute)" />
                     <YAxis
                       tick={{ fontSize: 11 }}
                       stroke="var(--ink-mute)"
@@ -193,9 +209,7 @@ export default function CostDashboardPage() {
                     <tr key={t.tier} className="border-t border-border">
                       <td className="py-2 capitalize text-ink">{t.tier}</td>
                       <td className="py-2 text-ink-soft">{t.n_queries}</td>
-                      <td className="py-2 text-ink-soft">
-                        {t.avg_inference_calls}
-                      </td>
+                      <td className="py-2 text-ink-soft">{t.avg_inference_calls}</td>
                       <td className="py-2 text-right font-mono text-ink">
                         {usd(t.total_cost_usd, 5)}
                       </td>
@@ -250,12 +264,20 @@ export default function CostDashboardPage() {
                   <span className="min-w-0 flex-1 truncate text-ink">
                     {r.question}
                   </span>
+                  {r.mocked && (
+                    <span
+                      className="shrink-0 rounded-sm px-1.5 py-0.5 text-[11px]"
+                      style={{ background: "var(--warn-soft)", color: "var(--warn)" }}
+                      title="Simulated — no GPU billed; modelled cost"
+                    >
+                      sim
+                    </span>
+                  )}
                   <span className="shrink-0 rounded-sm bg-surface-2 px-1.5 py-0.5 text-[11px] capitalize text-ink-soft">
                     {r.thinking_tier}
                   </span>
                   <span className="shrink-0 font-mono text-[11px] text-ink-mute">
-                    {r.n_inference_calls} calls ·{" "}
-                    {(r.total_latency_ms / 1000).toFixed(1)}s
+                    {r.n_inference_calls} calls · {(r.total_latency_ms / 1000).toFixed(1)}s
                   </span>
                   <span className="shrink-0 font-mono text-xs text-ink">
                     {usd(r.total_cost_usd, 5)}
@@ -273,9 +295,7 @@ export default function CostDashboardPage() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <Card className="px-4 py-3">
-      <div className="font-display text-2xl font-semibold text-ink">
-        {value}
-      </div>
+      <div className="font-display text-2xl font-semibold text-ink">{value}</div>
       <div className="text-xs text-ink-mute">{label}</div>
     </Card>
   );

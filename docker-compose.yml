@@ -1,30 +1,80 @@
+# ════════════════════════════════════════════════════════════════════════════
+# Medical AI Gateway — full stack, single `docker-compose up`.
+#
+# Services (7):
+#   1. nginx         reverse proxy + load balancer (the only ingress)
+#   2. cloudflared   Cloudflare tunnel → points at nginx (zero open host ports)
+#   3. frontend      Next.js 14
+#   4. backend       FastAPI (STATELESS — scale via deploy.replicas)
+#   5. qdrant-node1  distributed vector DB, peer 1 (bootstrap)
+#   6. qdrant-node2  distributed vector DB, peer 2 (joins node1)
+#   7. postgres      metadata, query logs, costs, app_config (SINGLE instance)
+#
+# At scaffold stage everything is real and runnable; feature code arrives in
+# later build steps. The point of this file is to let you run it and confirm
+# the topology — especially that Qdrant forms a 2-node cluster.
+# ════════════════════════════════════════════════════════════════════════════
+
 services:
+  # ──────────────────────────────────────────────────────────────────────────
+  # 1. NGINX — single ingress. Cloudflare tunnel points here. No host ports
+  #    published in production; we expose 8090 on localhost ONLY for local dev
+  #    so you can hit http://localhost:8090 before configuring the tunnel.
+  # ──────────────────────────────────────────────────────────────────────────
   nginx:
     build: ./infra/nginx
     depends_on:
       - frontend
       - backend
     ports:
-      - "127.0.0.1:8090:80"
+      - "127.0.0.1:8090:80" # local-dev convenience; remove for tunnel-only prod
     restart: unless-stopped
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # 2. CLOUDFLARED — outbound tunnel to Cloudflare edge. Routes public traffic
+  #    to nginx:80 over the internal Docker network. No inbound ports on host.
+  #    Token comes from .env. Until you set a real token, this service will
+  #    fail to connect — that's expected and does NOT block the rest of the
+  #    stack. See docs/cloudflare-tunnel.md.
+  # ──────────────────────────────────────────────────────────────────────────
   cloudflared:
     image: cloudflare/cloudflared:latest
+    # Remotely-managed tunnel: all routing (which public hostname → which
+    # internal service) is configured in the Cloudflare dashboard, not here.
+    # This container just needs the tunnel TOKEN. It reaches nginx by service
+    # name over the shared Docker network. Public hostname should map to
+    # http://nginx:80 in the dashboard. See docs/cloudflare-tunnel.md.
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     profiles:
-      - tunnel
+      - tunnel # dormant in normal dev; start with: docker compose --profile tunnel up
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
       - nginx
     restart: unless-stopped
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # 3. FRONTEND — Next.js 14. Talks to backend only through Nginx in prod; the
+  #    BACKEND_URL rewrite is a dev convenience.
+  # ──────────────────────────────────────────────────────────────────────────
   frontend:
     build: ./frontend
     environment:
       - BACKEND_URL=http://backend:8000
     restart: unless-stopped
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # 4. BACKEND — FastAPI. STATELESS. Scale horizontally by bumping replicas:
+  #
+  #        docker compose up -d --scale backend=3
+  #
+  #    Nginx load-balances across replicas by re-resolving the `backend` DNS
+  #    name per request (Docker's embedded DNS returns all replica IPs in
+  #    rotation). Verify it's working by hitting /api/admin/whoami repeatedly —
+  #    the hostname rotates across replicas. Concurrent replicas booting is safe:
+  #    Alembic migrations are guarded by a Postgres advisory lock (step 3).
+  #    See README "Scaling".
+  # ──────────────────────────────────────────────────────────────────────────
   backend:
     build: ./backend
     environment:
@@ -34,13 +84,17 @@ services:
       - RUNPOD_API_KEY=${RUNPOD_API_KEY}
       - ACTIVE_STORAGE_BACKEND_DEFAULT=local
       - RUN_MIGRATIONS=1
+      # Inference: mock by default ($0 dev). Set to 0 with real RunPod endpoints.
       - MOCK_INFERENCE=1
+      # LocalStorageBackend writes uploaded PDFs here (backed by a volume).
       - LOCAL_PDF_STORAGE_PATH=/data/pdfs
+      # AWS vars only read when AWS backend is active:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       - AWS_REGION=${AWS_REGION:-}
       - S3_BUCKET=${S3_BUCKET:-}
     volumes:
+      # Local-mode PDF storage. In AWS mode this is unused (files go to S3).
       - backend_pdf_data:/data/pdfs
     depends_on:
       postgres:
@@ -50,7 +104,33 @@ services:
       qdrant-node2:
         condition: service_started
     restart: unless-stopped
+    # NOTE: do NOT publish a host port — backend is only reachable via Nginx.
+    # deploy.replicas works under `docker compose up --scale backend=N` or in
+    # swarm mode; documented in README.
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # 5. + 6. QDRANT DISTRIBUTED CLUSTER (2 nodes)
+  #
+  #   Cluster formation:
+  #     - node1 bootstraps the cluster (--uri points at itself).
+  #     - node2 joins via --bootstrap pointing at node1's internal P2P port.
+  #   Ports per node:
+  #     6333 = REST/HTTP API,  6334 = gRPC,  6335 = P2P (inter-node consensus).
+  #
+  #   Sharding & replication are set PER COLLECTION at creation time (see
+  #   backend/app/rag/qdrant_client.py), NOT here — Qdrant has no global shard
+  #   setting. Our collections will be created with:
+  #         shard_number = 2          → data split across both nodes
+  #         replication_factor = 2    → each shard copied to both nodes
+  #   That demonstrates horizontal sharding AND replication. See the honest
+  #   caveat in docs/architecture.md: two nodes on one host is a topology demo,
+  #   not real fault tolerance.
+  #
+  #   DATA DIRECTORY is mounted from an env var so the SAME compose file works
+  #   with a local Docker volume OR a cloud-backed EBS mount — no code change,
+  #   just point QDRANT_NODE_N_VOLUME at a different path. This is the
+  #   storage-scaling story.
+  # ──────────────────────────────────────────────────────────────────────────
   qdrant-node1:
     image: qdrant/qdrant:v1.10.1
     command: ./qdrant --uri http://qdrant-node1:6335
@@ -62,6 +142,7 @@ services:
 
   qdrant-node2:
     image: qdrant/qdrant:v1.10.1
+    # node2 joins the cluster bootstrapped by node1.
     command: ./qdrant --bootstrap http://qdrant-node1:6335 --uri http://qdrant-node2:6335
     environment:
       - QDRANT__CLUSTER__ENABLED=true
@@ -71,6 +152,10 @@ services:
       - qdrant-node1
     restart: unless-stopped
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # 7. POSTGRESQL — SINGLE instance. This is the documented scaling bottleneck
+  #    (see docs/scaling.md: production → managed RDS + read replicas).
+  # ──────────────────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     environment:
@@ -86,6 +171,13 @@ services:
       retries: 10
     restart: unless-stopped
 
+# ════════════════════════════════════════════════════════════════════════════
+# VOLUMES
+#   The two named Qdrant volumes are the DEFAULT (local Docker volume) targets.
+#   To use EBS instead, set QDRANT_NODE_1_VOLUME / QDRANT_NODE_2_VOLUME in .env
+#   to the EBS mount paths (e.g. /mnt/qdrant-node1) — the bind path replaces the
+#   named volume with no code change. See docs/aws-storage.md.
+# ════════════════════════════════════════════════════════════════════════════
 volumes:
   qdrant_node1_data:
   qdrant_node2_data:

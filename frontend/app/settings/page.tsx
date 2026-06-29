@@ -1,5 +1,17 @@
 "use client";
 
+/**
+ * Settings — the storage backend switcher (step 10).
+ *
+ * Shows the active backend, lets you switch between Local and AWS, and:
+ *   • runs a readiness probe before allowing a switch (blocks switching into a
+ *     misconfigured AWS state — the next upload would otherwise fail),
+ *   • requires confirming the "fresh index, no migration" warning,
+ *   • surfaces current storage stats (disk warning for Local, cost for AWS).
+ *
+ * The switch takes effect immediately (the backend resolves the active backend
+ * per request) — no restart.
+ */
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
@@ -22,7 +34,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [pending, setPending] = useState<string | null>(null);
+  // switch flow state
+  const [pending, setPending] = useState<string | null>(null); // backend being switched to
   const [readiness, setReadiness] = useState<StorageReadiness | null>(null);
   const [checking, setChecking] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -47,6 +60,7 @@ export default function SettingsPage() {
     load();
   }, [load]);
 
+  // when a target backend is chosen, probe readiness
   const beginSwitch = async (name: string) => {
     if (name === settings?.active) return;
     setPending(name);
@@ -87,9 +101,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <header className="fade-up">
-        <h1 className="font-display text-3xl font-semibold text-ink">
-          Settings
-        </h1>
+        <h1 className="font-display text-3xl font-semibold text-ink">Settings</h1>
         <p className="mt-1 text-ink-soft">
           Choose where uploaded files and vector data are stored.
         </p>
@@ -127,15 +139,13 @@ export default function SettingsPage() {
                       "rounded border p-4 transition-colors",
                       active
                         ? "border-brand bg-brand-soft"
-                        : "border-border bg-surface",
+                        : "border-border bg-surface"
                     )}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-ink">
-                            {opt.label}
-                          </span>
+                          <span className="font-medium text-ink">{opt.label}</span>
                           <span className="text-xs text-ink-mute">
                             — {opt.tagline}
                           </span>
@@ -184,7 +194,7 @@ export default function SettingsPage() {
                     "mb-3 rounded-sm border px-3 py-2 text-sm",
                     readiness.ready
                       ? "border-ok/30 bg-[var(--brand-soft)] text-brand-ink"
-                      : "border-[var(--danger)]/30 bg-[var(--warn-soft)] text-danger",
+                      : "border-[var(--danger)]/30 bg-[var(--warn-soft)] text-danger"
                   )}
                 >
                   {readiness.ready ? "✓ " : "✗ "}
@@ -204,18 +214,14 @@ export default function SettingsPage() {
                 >
                   {switching ? <Spinner /> : "Confirm switch"}
                 </Button>
-                <Button
-                  variant="ghost"
-                  onClick={cancelSwitch}
-                  disabled={switching}
-                >
+                <Button variant="ghost" onClick={cancelSwitch} disabled={switching}>
                   Cancel
                 </Button>
               </div>
               {readiness && !readiness.ready && (
                 <p className="mt-2 text-xs text-ink-mute">
-                  This backend isn’t reachable, so the switch is blocked. Fix
-                  the configuration and try again.
+                  This backend isn’t reachable, so the switch is blocked. Fix the
+                  configuration and try again.
                 </p>
               )}
             </Card>
@@ -240,10 +246,11 @@ export default function SettingsPage() {
                     <dd
                       className={cn(
                         "font-medium",
-                        stats.disk_warning ? "text-warn" : "text-ink",
+                        stats.disk_warning ? "text-warn" : "text-ink"
                       )}
                     >
-                      {stats.disk_usage_percent}%{stats.disk_warning && " ⚠"}
+                      {stats.disk_usage_percent}%
+                      {stats.disk_warning && " ⚠"}
                     </dd>
                   </div>
                 )}

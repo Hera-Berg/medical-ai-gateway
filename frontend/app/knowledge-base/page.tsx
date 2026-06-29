@@ -1,12 +1,15 @@
 "use client";
 
+/**
+ * Knowledge Base — the document & collection management page.
+ *
+ * Layout: left column manages collections (create with corpus_type, select to
+ * scope the view); right column is the upload dropzone + the document library
+ * for the selected collection. The corpus-type distinction is visible at every
+ * level via CorpusBadge.
+ */
 import { useCallback, useEffect, useState } from "react";
-import {
-  api,
-  type Collection,
-  type Document,
-  type CorpusType,
-} from "@/lib/api";
+import { api, type Collection, type Document, type CorpusType } from "@/lib/api";
 import { Button, Card, Input, Spinner, cn } from "@/components/ui/primitives";
 import { CorpusBadge } from "@/components/corpus-badge";
 import { UploadDropzone } from "@/components/knowledge-base/upload-dropzone";
@@ -19,6 +22,7 @@ export default function KnowledgeBasePage() {
   const [docsLoading, setDocsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // new-collection form
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<CorpusType>("authoritative");
   const [creating, setCreating] = useState(false);
@@ -29,7 +33,7 @@ export default function KnowledgeBasePage() {
       const cols = await api.listCollections();
       setCollections(cols);
       setSelected((prev) =>
-        prev ? (cols.find((c) => c.id === prev.id) ?? null) : (cols[0] ?? null),
+        prev ? cols.find((c) => c.id === prev.id) ?? null : cols[0] ?? null
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -80,7 +84,7 @@ export default function KnowledgeBasePage() {
   const deleteCollection = async (c: Collection) => {
     if (
       !confirm(
-        `Delete collection "${c.name}" and all its documents + vectors? This cannot be undone.`,
+        `Delete collection "${c.name}" and all its documents + vectors? This cannot be undone.`
       )
     )
       return;
@@ -94,12 +98,11 @@ export default function KnowledgeBasePage() {
   };
 
   const deleteDocument = async (d: Document) => {
-    if (!confirm(`Delete "${d.filename}" and its ${d.chunk_count} chunks?`))
-      return;
+    if (!confirm(`Delete "${d.filename}" and its ${d.chunk_count} chunks?`)) return;
     try {
       await api.deleteDocument(d.id);
       if (selected) loadDocuments(selected.id);
-      loadCollections();
+      loadCollections(); // chunk counts may inform UI later
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -149,7 +152,7 @@ export default function KnowledgeBasePage() {
                         ? t === "authoritative"
                           ? "border-authoritative bg-authoritative-soft text-authoritative-ink"
                           : "border-personal bg-personal-soft text-personal-ink"
-                        : "border-border text-ink-soft hover:bg-surface-2",
+                        : "border-border text-ink-soft hover:bg-surface-2"
                     )}
                   >
                     {t}
@@ -187,7 +190,7 @@ export default function KnowledgeBasePage() {
                     "group flex w-full items-center justify-between rounded border px-3 py-2.5 text-left transition-colors",
                     selected?.id === c.id
                       ? "border-brand bg-brand-soft"
-                      : "border-border bg-surface hover:bg-surface-2",
+                      : "border-border bg-surface hover:bg-surface-2"
                   )}
                 >
                   <span className="min-w-0">

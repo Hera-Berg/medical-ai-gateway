@@ -1,3 +1,11 @@
+/**
+ * Typed client for the FastAPI backend. All calls go through Nginx at /api,
+ * which strips the prefix and round-robins to a backend replica.
+ *
+ * Types here mirror the backend pydantic schemas (app/schemas/rag.py). Kept
+ * deliberately small and explicit rather than codegen'd, so the contract is
+ * readable in one place.
+ */
 export type CorpusType = "authoritative" | "personal";
 
 export interface Collection {
@@ -28,11 +36,7 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
     let detail = `${res.status} ${res.statusText}`;
     try {
       const body = await res.json();
-      if (body?.detail)
-        detail =
-          typeof body.detail === "string"
-            ? body.detail
-            : JSON.stringify(body.detail);
+      if (body?.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
     } catch {
       /* ignore */
     }
@@ -42,6 +46,7 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
 }
 
 export const api = {
+  // ── Collections ──
   listCollections: () =>
     fetch(`${BASE}/collections`).then((r) => jsonOrThrow<Collection[]>(r)),
 
@@ -58,21 +63,26 @@ export const api = {
 
   deleteCollection: (id: string) =>
     fetch(`${BASE}/collections/${id}`, { method: "DELETE" }).then((r) =>
-      jsonOrThrow<{ deleted: string }>(r),
+      jsonOrThrow<{ deleted: string }>(r)
     ),
 
+  // ── Documents ──
   listDocuments: (collectionId?: string) => {
     const q = collectionId ? `?collection_id=${collectionId}` : "";
-    return fetch(`${BASE}/documents${q}`).then((r) =>
-      jsonOrThrow<Document[]>(r),
-    );
+    return fetch(`${BASE}/documents${q}`).then((r) => jsonOrThrow<Document[]>(r));
   },
 
   deleteDocument: (id: string) =>
     fetch(`${BASE}/documents/${id}`, { method: "DELETE" }).then((r) =>
-      jsonOrThrow<{ deleted: string }>(r),
+      jsonOrThrow<{ deleted: string }>(r)
     ),
 
+  /**
+   * Upload a document. Returns the created Document (with chunk_count) once the
+   * full ingestion pipeline (store -> parse -> chunk -> embed -> index) finishes.
+   * The pipeline is synchronous server-side; the UI shows staged progress
+   * optimistically while this awaits.
+   */
   uploadDocument: (params: {
     collectionId: string;
     file: File;
@@ -87,18 +97,17 @@ export const api = {
     if (params.sourceUrl) fd.append("source_url", params.sourceUrl);
     if (params.publishedDate) fd.append("published_date", params.publishedDate);
     return fetch(`${BASE}/documents`, { method: "POST", body: fd }).then((r) =>
-      jsonOrThrow<Document>(r),
+      jsonOrThrow<Document>(r)
     );
   },
 
+  // ── Inspector ──
   inspectorOverview: () =>
-    fetch(`${BASE}/inspector/overview`).then((r) =>
-      jsonOrThrow<InspectorOverview>(r),
-    ),
+    fetch(`${BASE}/inspector/overview`).then((r) => jsonOrThrow<InspectorOverview>(r)),
 
   inspectorChunks: (collectionId: string) =>
     fetch(`${BASE}/inspector/collections/${collectionId}/chunks`).then((r) =>
-      jsonOrThrow<InspectorChunks>(r),
+      jsonOrThrow<InspectorChunks>(r)
     ),
 
   inspectorDryRun: (body: {
@@ -114,17 +123,16 @@ export const api = {
 
   inspectorScatter: (collectionId: string) =>
     fetch(`${BASE}/inspector/collections/${collectionId}/scatter`).then((r) =>
-      jsonOrThrow<ScatterResult>(r),
+      jsonOrThrow<ScatterResult>(r)
     ),
 
+  // ── Settings / storage backend ──
   getStorageSettings: () =>
-    fetch(`${BASE}/settings/storage`).then((r) =>
-      jsonOrThrow<StorageSettings>(r),
-    ),
+    fetch(`${BASE}/settings/storage`).then((r) => jsonOrThrow<StorageSettings>(r)),
 
   storageReadiness: (name: string) =>
     fetch(`${BASE}/settings/storage/readiness/${name}`).then((r) =>
-      jsonOrThrow<StorageReadiness>(r),
+      jsonOrThrow<StorageReadiness>(r)
     ),
 
   switchStorageBackend: (backend: string, confirm: boolean) =>
@@ -135,38 +143,29 @@ export const api = {
     }).then((r) => jsonOrThrow<{ active: string; detail: string }>(r)),
 
   storageStats: () =>
-    fetch(`${BASE}/admin/storage/stats`).then((r) =>
-      jsonOrThrow<StorageStats>(r),
-    ),
+    fetch(`${BASE}/admin/storage/stats`).then((r) => jsonOrThrow<StorageStats>(r)),
 
+  // ── Admin ──
   adminCluster: () =>
     fetch(`${BASE}/admin/cluster`).then((r) => jsonOrThrow<AdminCluster>(r)),
   adminDatabase: () =>
     fetch(`${BASE}/admin/database`).then((r) => jsonOrThrow<AdminDatabase>(r)),
 
+  // ── Cost dashboard ──
   costSummary: () =>
     fetch(`${BASE}/costs/summary`).then((r) => jsonOrThrow<CostSummary>(r)),
   costByModel: () =>
-    fetch(`${BASE}/costs/by-model`).then((r) =>
-      jsonOrThrow<{ by_model: CostByModel[] }>(r),
-    ),
+    fetch(`${BASE}/costs/by-model`).then((r) => jsonOrThrow<{ by_model: CostByModel[] }>(r)),
   costByTier: () =>
-    fetch(`${BASE}/costs/by-tier`).then((r) =>
-      jsonOrThrow<{ by_tier: CostByTier[] }>(r),
-    ),
+    fetch(`${BASE}/costs/by-tier`).then((r) => jsonOrThrow<{ by_tier: CostByTier[] }>(r)),
   costTimeline: () =>
-    fetch(`${BASE}/costs/timeline`).then((r) =>
-      jsonOrThrow<{ timeline: CostTimelinePoint[] }>(r),
-    ),
+    fetch(`${BASE}/costs/timeline`).then((r) => jsonOrThrow<{ timeline: CostTimelinePoint[] }>(r)),
   costRecent: () =>
-    fetch(`${BASE}/costs/recent`).then((r) =>
-      jsonOrThrow<{ recent: CostRecentRow[] }>(r),
-    ),
+    fetch(`${BASE}/costs/recent`).then((r) => jsonOrThrow<{ recent: CostRecentRow[] }>(r)),
 
+  // ── Chat / query ──
   queryModels: () =>
-    fetch(`${BASE}/query/models`).then((r) =>
-      jsonOrThrow<QueryModelsResponse>(r),
-    ),
+    fetch(`${BASE}/query/models`).then((r) => jsonOrThrow<QueryModelsResponse>(r)),
 
   runQuery: (body: {
     question: string;
@@ -240,6 +239,9 @@ export interface QueryResponse {
 
 export interface CostSummary {
   n_queries: number;
+  n_mocked: number;
+  all_mocked: boolean;
+  any_mocked: boolean;
   total_cost_usd: number;
   total_input_tokens: number;
   total_output_tokens: number;
@@ -279,6 +281,7 @@ export interface CostRecentRow {
   n_inference_calls: number;
   total_cost_usd: number;
   total_latency_ms: number;
+  mocked: boolean;
   created_at: string;
 }
 
@@ -337,6 +340,7 @@ export interface AdminDatabase {
   database_size: string | null;
 }
 
+// ── Inspector types ──
 export interface InspectorOverview {
   collections: {
     id: string;

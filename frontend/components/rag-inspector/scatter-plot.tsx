@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * ScatterPlot — renders the server-computed PCA 2D coordinates as an SVG scatter.
+ * Each point is a chunk; hovering shows its text + page. Coordinates come
+ * pre-projected from the backend (server-side PCA), so this component is purely
+ * presentational: it normalises the coords into the viewBox and draws.
+ *
+ * SVG (not canvas) is deliberate at this scale (hundreds–few thousand points):
+ * each point stays a real DOM node so hover/tooltip is trivial and crisp. For
+ * tens of thousands we'd switch to canvas/WebGL — noted, not needed now.
+ */
 import { useMemo, useState } from "react";
 import type { ScatterResult } from "@/lib/api";
 
@@ -12,17 +22,15 @@ export function ScatterPlot({
   accent,
 }: {
   data: ScatterResult;
-  accent: string;
+  accent: string; // CSS var for the corpus colour
 }) {
   const [hover, setHover] = useState<number | null>(null);
 
   const { norm, xExtent, yExtent } = useMemo(() => {
     const xs = data.points.map((p) => p.x);
     const ys = data.points.map((p) => p.y);
-    const minX = Math.min(...xs),
-      maxX = Math.max(...xs);
-    const minY = Math.min(...ys),
-      maxY = Math.max(...ys);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
     const spanX = maxX - minX || 1;
     const spanY = maxY - minY || 1;
     const norm = data.points.map((p) => ({
@@ -62,10 +70,7 @@ export function ScatterPlot({
               fillOpacity={active ? 1 : 0.55}
               stroke={active ? "white" : "none"}
               strokeWidth={active ? 1.5 : 0}
-              style={{
-                transition: "r .08s, fill-opacity .08s",
-                cursor: "crosshair",
-              }}
+              style={{ transition: "r .08s, fill-opacity .08s", cursor: "crosshair" }}
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover((h) => (h === i ? null : h))}
             />
@@ -93,8 +98,7 @@ export function ScatterPlot({
 
       <div className="mt-2 flex items-center justify-between text-[11px] text-ink-mute">
         <span>
-          {data.point_count} chunks · {data.method.toUpperCase()} projection to
-          2D
+          {data.point_count} chunks · {data.method.toUpperCase()} projection to 2D
         </span>
         <span>hover a point to see its text</span>
       </div>

@@ -1,14 +1,30 @@
+"""
+Settings router — the active storage backend control (step 10).
+
+  GET  /settings/storage           current backend + available options + labels
+  GET  /settings/storage/readiness/{name}   probe whether a backend is usable
+  POST /settings/storage           switch the active backend (writes app_config)
+
+Switching only updates app_config.active_storage_backend. The per-request
+resolver (get_active_backend) reads that on the next request, so the switch
+takes effect immediately with no restart. Switching does NOT migrate existing
+data — the UI warns about this and requires confirmation; enforcement of "fresh
+index" is simply that the new backend starts empty (old vectors/files remain in
+the old backend, unreferenced).
+"""
 from __future__ import annotations
 
-from app.db.models import CONFIG_ACTIVE_STORAGE_BACKEND, AppConfig
-from app.db.session import get_db
-from app.storage.registry import available_backends, get_backend
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models import CONFIG_ACTIVE_STORAGE_BACKEND, AppConfig
+from app.db.session import get_db
+from app.storage.registry import available_backends, get_backend
+
 router = APIRouter(prefix="/settings", tags=["settings"])
 
+# UI metadata per backend (labels straight from the spec).
 BACKEND_META = {
     "local": {
         "label": "Local Storage",
@@ -35,16 +51,14 @@ async def get_storage_settings(db: AsyncSession = Depends(get_db)):
     current = await _current(db)
     options = []
     for name in available_backends():
-        meta = BACKEND_META.get(
-            name,
-            {"label": name, "tagline": "", "description": "", "requires_config": False},
-        )
+        meta = BACKEND_META.get(name, {"label": name, "tagline": "", "description": "", "requires_config": False})
         options.append({"name": name, **meta})
     return {"active": current, "options": options}
 
 
 @router.get("/storage/readiness/{name}")
 async def storage_readiness(name: str):
+    """Probe whether a backend is usable right now (used before switching)."""
     try:
         backend = get_backend(name)
     except ValueError as exc:
@@ -55,7 +69,7 @@ async def storage_readiness(name: str):
 
 class SwitchRequest(BaseModel):
     backend: str
-    confirm: bool = False
+    confirm: bool = False  # UI sets true after the fresh-index warning
 
 
 @router.post("/storage")
@@ -73,6 +87,7 @@ async def switch_storage_backend(
             detail="Confirmation required: switching starts a fresh index.",
         )
 
+    # Safety: don't switch INTO a backend that isn't ready (e.g. AWS misconfigured).
     backend = get_backend(body.backend)
     readiness = await backend.check_ready()
     if not readiness.ready:

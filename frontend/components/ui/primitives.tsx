@@ -1,11 +1,17 @@
 "use client";
 
+/**
+ * Shared UI primitives, owned in-repo (shadcn/ui idiom: copy-in components you
+ * control, not a black-box dependency). Tailwind-based, themed via the design
+ * tokens in globals.css. Kept in one file at this scale; split later if it grows.
+ */
 import * as React from "react";
 
 export function cn(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
 }
 
+// ── Button ──────────────────────────────────────────────────────────────────
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "ghost" | "outline" | "danger";
   size?: "sm" | "md";
@@ -27,13 +33,11 @@ export function Button({
     danger: "text-danger hover:bg-[var(--warn-soft)]",
   };
   return (
-    <button
-      className={cn(base, sizes[size], variants[variant], className)}
-      {...props}
-    />
+    <button className={cn(base, sizes[size], variants[variant], className)} {...props} />
   );
 }
 
+// ── Card ────────────────────────────────────────────────────────────────────
 export function Card({
   className,
   ...props
@@ -42,13 +46,14 @@ export function Card({
     <div
       className={cn(
         "rounded border border-border bg-surface shadow-sm",
-        className,
+        className
       )}
       {...props}
     />
   );
 }
 
+// ── Badge ───────────────────────────────────────────────────────────────────
 export function Badge({
   className,
   ...props
@@ -57,13 +62,14 @@ export function Badge({
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs font-medium",
-        className,
+        className
       )}
       {...props}
     />
   );
 }
 
+// ── Input ───────────────────────────────────────────────────────────────────
 export const Input = React.forwardRef<
   HTMLInputElement,
   React.InputHTMLAttributes<HTMLInputElement>
@@ -73,13 +79,14 @@ export const Input = React.forwardRef<
       ref={ref}
       className={cn(
         "w-full rounded-sm border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20",
-        className,
+        className
       )}
       {...props}
     />
   );
 });
 
+// ── Spinner ─────────────────────────────────────────────────────────────────
 export function Spinner({ className }: { className?: string }) {
   return (
     <svg
@@ -89,20 +96,8 @@ export function Spinner({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       fill="none"
     >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeOpacity="0.25"
-        strokeWidth="3"
-      />
-      <path
-        d="M22 12a10 10 0 0 0-10-10"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+      <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
     </svg>
   );
 }

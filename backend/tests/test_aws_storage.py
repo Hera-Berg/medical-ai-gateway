@@ -1,3 +1,11 @@
+"""
+Tests for AWSStorageBackend against mocked S3 (moto) — no real AWS, no billing.
+
+Run:  pip install -r requirements-dev.txt && pytest tests/test_aws_storage.py
+
+Proves the call sequence + our handling are correct. Real S3 (IAM, bucket
+policy, region/network) is only confirmable against a live account (step 18).
+"""
 import os
 
 import boto3
@@ -13,8 +21,8 @@ def _aws_env(monkeypatch):
     monkeypatch.setenv("AWS_REGION", "us-east-1")
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    # settings are cached; clear so the test env is picked up
     from app.config import get_settings
-
     get_settings.cache_clear()
 
 

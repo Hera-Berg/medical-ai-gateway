@@ -16,6 +16,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+# Enum value lists (kept in sync with app/db/models.py).
 corpus_type = postgresql.ENUM(
     "authoritative", "personal", name="corpus_type", create_type=False
 )
@@ -40,11 +41,13 @@ inference_pass_role = postgresql.ENUM(
 def upgrade() -> None:
     bind = op.get_bind()
 
+    # 1. Create enum types ONCE, before any table references them.
     corpus_type.create(bind, checkfirst=True)
     thinking_tier.create(bind, checkfirst=True)
     trace_event_type.create(bind, checkfirst=True)
     inference_pass_role.create(bind, checkfirst=True)
 
+    # 2. app_config (no deps)
     op.create_table(
         "app_config",
         sa.Column("key", sa.String(128), primary_key=True),
@@ -57,6 +60,7 @@ def upgrade() -> None:
         ),
     )
 
+    # 3. collections
     op.create_table(
         "collections",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -75,6 +79,7 @@ def upgrade() -> None:
         ),
     )
 
+    # 4. documents
     op.create_table(
         "documents",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -100,6 +105,7 @@ def upgrade() -> None:
         ),
     )
 
+    # 5. chunks
     op.create_table(
         "chunks",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -132,6 +138,7 @@ def upgrade() -> None:
         ),
     )
 
+    # 6. queries
     op.create_table(
         "queries",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -153,6 +160,7 @@ def upgrade() -> None:
         ),
     )
 
+    # 7. query_costs
     op.create_table(
         "query_costs",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -178,6 +186,7 @@ def upgrade() -> None:
         ),
     )
 
+    # 8. trace_events
     op.create_table(
         "trace_events",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -207,6 +216,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("query_id", "sequence", name="uq_trace_event_sequence"),
     )
 
+    # 9. retrieved_chunks (references trace_events + soft-refs chunks)
     op.create_table(
         "retrieved_chunks",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),

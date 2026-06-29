@@ -18,7 +18,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body className="min-h-screen font-body">
-        {/*Disclaimer is STRUCTURAL.*/}
+        {/*
+          Disclaimer is STRUCTURAL: rendered in the root layout, present on every
+          page, above the shell. The shell then frames all page content.
+        */}
         <DisclaimerBanner />
         <AppShell>{children}</AppShell>
       </body>

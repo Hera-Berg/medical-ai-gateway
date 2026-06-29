@@ -1,22 +1,20 @@
 "use client";
 
+/**
+ * App shell — the persistent frame every page renders inside: brand mark, the
+ * navigation rail to all six sections, and the content slot. Built once here so
+ * every subsequent page (Inspector, Dashboard, Settings, Admin, Chat) drops in
+ * consistently.
+ */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/components/ui/primitives";
 
 const NAV: { href: string; label: string; desc: string }[] = [
   { href: "/", label: "Chat", desc: "Ask across your corpora" },
-  {
-    href: "/knowledge-base",
-    label: "Knowledge Base",
-    desc: "Documents & collections",
-  },
+  { href: "/knowledge-base", label: "Knowledge Base", desc: "Documents & collections" },
   { href: "/rag-inspector", label: "RAG Inspector", desc: "Diagnostic" },
-  {
-    href: "/cost-dashboard",
-    label: "Cost Dashboard",
-    desc: "Spend & break-even",
-  },
+  { href: "/cost-dashboard", label: "Cost Dashboard", desc: "Spend & break-even" },
   { href: "/settings", label: "Settings", desc: "Storage backend" },
   { href: "/admin", label: "Admin", desc: "Cluster & DB stats" },
 ];
@@ -53,14 +51,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   "group rounded px-3 py-2 transition-colors",
                   active
                     ? "bg-brand-soft text-brand-ink"
-                    : "text-ink-soft hover:bg-surface-2 hover:text-ink",
+                    : "text-ink-soft hover:bg-surface-2 hover:text-ink"
                 )}
               >
                 <div className="text-sm font-medium">{item.label}</div>
                 <div
                   className={cn(
                     "text-[11px]",
-                    active ? "text-brand/70" : "text-ink-mute",
+                    active ? "text-brand/70" : "text-ink-mute"
                   )}
                 >
                   {item.desc}
@@ -71,8 +69,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto rounded-sm border border-border bg-surface-2 px-3 py-2 text-[11px] leading-relaxed text-ink-mute">
-          Demo &amp; educational tool. Not medical advice. Synthetic records
-          only.
+          Demo &amp; educational tool. Not medical advice. Synthetic records only.
         </div>
       </aside>
 

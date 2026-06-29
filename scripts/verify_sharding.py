@@ -1,5 +1,32 @@
 #!/usr/bin/env python3
+"""
+verify_sharding.py — confirm the Qdrant cluster shards and replicates data
+across both nodes (spec step 6: "confirm documents shard correctly across both
+nodes before proceeding").
 
+This turns the raw /cluster JSON into a human-readable report of:
+  • how many shards a collection has,
+  • how points are distributed across shards,
+  • whether each shard is replicated onto the other peer (replication_factor),
+  • the health state of every shard replica.
+
+Usage (from the host, talking to the cluster over the Docker network):
+
+    # against every collection:
+    docker run --rm --network medical-ai-gateway_default \
+        -v "$PWD/scripts:/s" python:3.11-slim \
+        python /s/verify_sharding.py
+
+    # or one collection:
+    ... python /s/verify_sharding.py <collection_name>
+
+It uses only the stdlib (urllib) so it needs no pip install inside the
+throwaway container.
+
+HONEST NOTE printed in the report: two nodes on one host demonstrates the
+sharding + replication *configuration*; it is NOT fault tolerance, because both
+replicas share the machine. Real durability requires nodes on separate hosts.
+"""
 from __future__ import annotations
 
 import json
@@ -21,6 +48,7 @@ def list_collections() -> list[str]:
 
 
 def peers() -> dict[int, str]:
+    """peer_id -> uri, from the cluster topology."""
     data = _get("/cluster")
     out = {}
     for pid, info in data["result"]["peers"].items():
@@ -40,6 +68,7 @@ def report_collection(name: str, peer_uris: dict[int, str]) -> bool:
     print(f"  queried peer : {this_peer} ({peer_uris.get(this_peer, '?')})")
     print(f"  shard_count  : {r.get('shard_count')}")
 
+    # Build shard_id -> set of peers holding it.
     holders: dict[int, set[int]] = {}
     points: dict[int, int] = {}
     for s in local:
@@ -98,6 +127,13 @@ def main() -> int:
         except Exception as exc:
             print(f"\n=== {name} ===\n  ERROR: {exc}")
             ok = False
+
+    print("\n" + "-" * 64)
+    print("HONEST CAVEAT: two nodes on one host proves the sharding + replication")
+    print("CONFIGURATION and lets you watch distribution — it is NOT fault")
+    print("tolerance, since both replicas share the machine. Real durability")
+    print("needs nodes on separate hosts (see docs/scaling.md).")
+    print("-" * 64)
 
     print(f"\nRESULT: {'ALL CHECKS PASSED' if ok else 'some checks did not pass'}")
     return 0 if ok else 1

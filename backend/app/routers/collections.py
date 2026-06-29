@@ -1,15 +1,24 @@
+"""
+Collections router.
+
+A collection maps to a Qdrant namespace and carries its corpus_type (the trust
+boundary). The qdrant_collection name is derived deterministically from the
+corpus type + a slug of the name + a short uuid, so two collections never
+collide in Qdrant even if display names repeat across corpora.
+"""
 from __future__ import annotations
 
 import re
 import uuid
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.models import Collection
 from app.db.session import get_db
 from app.rag.qdrant_client import QdrantRAG
 from app.schemas.rag import CollectionCreate, CollectionOut
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
@@ -20,9 +29,7 @@ def _slug(name: str) -> str:
 
 @router.post("", response_model=CollectionOut)
 async def create_collection(body: CollectionCreate, db: AsyncSession = Depends(get_db)):
-    qdrant_name = (
-        f"{body.corpus_type.value}__{_slug(body.name)}__{uuid.uuid4().hex[:8]}"
-    )
+    qdrant_name = f"{body.corpus_type.value}__{_slug(body.name)}__{uuid.uuid4().hex[:8]}"
     coll = Collection(
         id=uuid.uuid4(),
         name=body.name,
@@ -34,30 +41,27 @@ async def create_collection(body: CollectionCreate, db: AsyncSession = Depends(g
     await db.commit()
     await db.refresh(coll)
 
+    # Create the backing Qdrant collection now so it's ready for uploads.
     await QdrantRAG().ensure_collection(qdrant_name)
     return coll
 
 
 @router.get("", response_model=list[CollectionOut])
 async def list_collections(db: AsyncSession = Depends(get_db)):
-    rows = (
-        (await db.execute(select(Collection).order_by(Collection.created_at)))
-        .scalars()
-        .all()
-    )
+    rows = (await db.execute(select(Collection).order_by(Collection.created_at))).scalars().all()
     return list(rows)
 
 
 @router.delete("/{collection_id}")
-async def delete_collection(
-    collection_id: uuid.UUID, db: AsyncSession = Depends(get_db)
-):
+async def delete_collection(collection_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     coll = await db.get(Collection, collection_id)
     if coll is None:
         raise HTTPException(status_code=404, detail="collection not found")
     qdrant_name = coll.qdrant_collection
+    # Cascade deletes documents + chunks in PG (FK ondelete=CASCADE).
     await db.delete(coll)
     await db.commit()
+    # Drop the Qdrant collection too (best-effort).
     try:
         await QdrantRAG().client.delete_collection(qdrant_name)
     except Exception:

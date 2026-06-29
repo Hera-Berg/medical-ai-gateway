@@ -1,12 +1,30 @@
+"""
+Query router — the core inference endpoint.
+
+  GET  /query/models     list selectable models (selector UI + cost preview)
+  POST /query            run a query: retrieve + infer (tier) + log + return
+
+POST persists the full relational trace the schema was built for: a Query row,
+its QueryCost roll-up, ordered TraceEvent rows (retrieval + inference_pass), and
+RetrievedChunk rows under each retrieval event (with provenance snapshots). The
+response returns the answer + the ordered trace + cost so the chat UI can render
+the thinking panel directly.
+
+Step 11: Low tier only (the orchestrator gates Medium/High until step 12, but
+the persistence + response shape already handle any number of passes).
+"""
 from __future__ import annotations
 
 import uuid
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.models import (
-    CONFIG_ACTIVE_STORAGE_BACKEND,
-    AppConfig,
-    Collection,
     CorpusType,
+    Collection,
     Query,
     QueryCost,
     RetrievedChunk,
@@ -14,18 +32,16 @@ from app.db.models import (
     TraceEvent,
     TraceEventType,
 )
+from app.db.models import CONFIG_ACTIVE_STORAGE_BACKEND, AppConfig
 from app.db.session import get_db
 from app.inference.orchestrator import Orchestrator, TracePass, TraceRetrieval
 from app.inference.registry import all_models, default_model_key, get_model
 from app.inference.tiers import TIER_MULTIPLIER
 from app.rag.retriever import RetrievedItem
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/query", tags=["query"])
 
+# All three tiers are live (step 12 implemented Medium/High).
 _ENABLED_TIERS = {ThinkingTier.low, ThinkingTier.medium, ThinkingTier.high}
 
 
@@ -40,6 +56,7 @@ async def list_models():
                 "gpu_tier": m.gpu_tier,
                 "per_second_usd": m.per_second_usd,
                 "capability_hint": m.capability_hint,
+                "deployed": m.deployed,
             }
             for m in all_models()
         ],
@@ -51,12 +68,12 @@ async def list_models():
 
 
 class QueryRequest(BaseModel):
-    model_config = {"protected_namespaces": ()}
+    model_config = {"protected_namespaces": ()}  # allow 'model_key' field name
 
     question: str
     model_key: str | None = None
     thinking_tier: ThinkingTier = ThinkingTier.low
-    collection_ids: list[uuid.UUID] | None = None
+    collection_ids: list[uuid.UUID] | None = None  # None = all
 
 
 @router.post("")
@@ -70,6 +87,7 @@ async def run_query(body: QueryRequest, db: AsyncSession = Depends(get_db)):
 
     model = get_model(body.model_key or default_model_key())
 
+    # resolve collection scope -> qdrant names
     stmt = select(Collection)
     if body.collection_ids:
         stmt = stmt.where(Collection.id.in_(body.collection_ids))
@@ -78,6 +96,7 @@ async def run_query(body: QueryRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="No collections in scope.")
     qdrant_names = [c.qdrant_collection for c in collections]
 
+    # run the tier
     orch = Orchestrator()
     run = await orch.run(
         question=body.question,
@@ -86,9 +105,11 @@ async def run_query(body: QueryRequest, db: AsyncSession = Depends(get_db)):
         qdrant_collections=qdrant_names,
     )
 
+    # active storage backend (for cost snapshot context)
     cfg = await db.get(AppConfig, CONFIG_ACTIVE_STORAGE_BACKEND)
     active_backend = cfg.value if cfg else "local"
 
+    # ── persist ──
     query = Query(
         id=uuid.uuid4(),
         question=body.question,
@@ -119,11 +140,9 @@ async def run_query(body: QueryRequest, db: AsyncSession = Depends(get_db)):
                         similarity_score=it.similarity_score,
                         chunk_text_snapshot=it.text,
                         source_filename=it.source_filename,
-                        source_corpus_type=(
-                            CorpusType(it.source_corpus_type)
-                            if it.source_corpus_type in ("authoritative", "personal")
-                            else CorpusType.authoritative
-                        ),
+                        source_corpus_type=CorpusType(it.source_corpus_type)
+                        if it.source_corpus_type in ("authoritative", "personal")
+                        else CorpusType.authoritative,
                         source_collection_name=it.source_collection_name,
                         source_page=it.source_page,
                         source_section=it.source_section,
@@ -158,10 +177,12 @@ async def run_query(body: QueryRequest, db: AsyncSession = Depends(get_db)):
             total_latency_ms=run.total_latency_ms,
             storage_backend=active_backend,
             storage_cost_usd_snapshot=0.0,
+            mocked=run.mocked,
         )
     )
     await db.commit()
 
+    # ── response (ordered trace for the thinking panel) ──
     events_out = []
     for ev in run.events:
         if isinstance(ev, TraceRetrieval):
@@ -202,11 +223,7 @@ async def run_query(body: QueryRequest, db: AsyncSession = Depends(get_db)):
     return {
         "query_id": str(query.id),
         "answer": run.final_answer,
-        "model": {
-            "key": model.key,
-            "display_name": model.display_name,
-            "gpu_tier": model.gpu_tier,
-        },
+        "model": {"key": model.key, "display_name": model.display_name, "gpu_tier": model.gpu_tier},
         "thinking_tier": body.thinking_tier.value,
         "mocked": run.mocked,
         "trace_events": events_out,

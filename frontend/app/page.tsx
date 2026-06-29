@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * Chat — the home page. Ask across your corpora, pick model + thinking depth,
+ * see the grounded answer with a collapsible provenance-rich thinking panel and
+ * a live cost panel (this query + cumulative session spend).
+ *
+ * Cost shown is time-based (RunPod per-second billing). In mock mode the answer
+ * is simulated; retrieval, provenance, trace, and cost math are all real.
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
@@ -13,7 +21,7 @@ import { ThinkingPanel } from "@/components/chat/thinking-panel";
 
 interface Turn {
   question: string;
-  response: QueryResponse | null;
+  response: QueryResponse | null; // null while loading
   error?: string;
 }
 
@@ -22,7 +30,7 @@ export default function ChatPage() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [model, setModel] = useState("");
   const [tier, setTier] = useState("low");
-  const [scope, setScope] = useState<string[]>([]);
+  const [scope, setScope] = useState<string[]>([]); // empty = all
   const [question, setQuestion] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -46,17 +54,19 @@ export default function ChatPage() {
 
   const toggleCollection = (id: string) => {
     setScope((prev) => {
+      // start from "all selected" when empty
       const base = prev.length === 0 ? collections.map((c) => c.id) : prev;
       const next = base.includes(id)
         ? base.filter((x) => x !== id)
         : [...base, id];
+      // if all are selected again, normalize back to [] (= all)
       return next.length === collections.length ? [] : next;
     });
   };
 
   const sessionCost = turns.reduce(
     (sum, t) => sum + (t.response?.cost.total_cost_usd ?? 0),
-    0,
+    0
   );
 
   const ask = useCallback(async () => {
@@ -74,15 +84,15 @@ export default function ChatPage() {
       });
       setTurns((t) =>
         t.map((turn, i) =>
-          i === t.length - 1 ? { ...turn, response: res } : turn,
-        ),
+          i === t.length - 1 ? { ...turn, response: res } : turn
+        )
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setTurns((t) =>
         t.map((turn, i) =>
-          i === t.length - 1 ? { ...turn, error: msg } : turn,
-        ),
+          i === t.length - 1 ? { ...turn, error: msg } : turn
+        )
       );
     } finally {
       setBusy(false);
@@ -221,10 +231,7 @@ export default function ChatPage() {
                         cost ${turn.response.cost.total_cost_usd.toFixed(5)}
                       </span>
                       <span>
-                        {(turn.response.cost.total_latency_ms / 1000).toFixed(
-                          1,
-                        )}
-                        s
+                        {(turn.response.cost.total_latency_ms / 1000).toFixed(1)}s
                       </span>
                       <span>
                         {turn.response.cost.n_inference_calls} inference{" "}
@@ -259,10 +266,7 @@ export default function ChatPage() {
             rows={2}
             className="flex-1 resize-none rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-brand disabled:opacity-50"
           />
-          <Button
-            onClick={ask}
-            disabled={busy || noCorpora || !question.trim()}
-          >
+          <Button onClick={ask} disabled={busy || noCorpora || !question.trim()}>
             {busy ? <Spinner /> : "Send"}
           </Button>
         </div>

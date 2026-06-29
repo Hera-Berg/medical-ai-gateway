@@ -1,13 +1,29 @@
+"""
+Cost dashboard router — aggregates the QueryCost rows written by /query.
+
+  GET /costs/summary    totals, averages, cold-start share, break-even
+  GET /costs/by-model   per-model spend/count/avg
+  GET /costs/by-tier    per-tier spend/count/avg
+  GET /costs/timeline   spend bucketed by day
+  GET /costs/recent     recent per-query rows for the history table
+
+COST MODEL: everything here is TIME-BASED (RunPod bills per GPU-second).
+total_cost_usd on each row already reflects billable seconds × per-second rate.
+The break-even compares measured average cost/query against a configurable
+monthly subscription anchor — honest because it's computed from real logged
+spend, not assumptions.
+"""
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from app.config import get_settings
-from app.db.models import Query, QueryCost
-from app.db.session import get_db
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import get_settings
+from app.db.models import Query, QueryCost
+from app.db.session import get_db
 
 router = APIRouter(prefix="/costs", tags=["costs"])
 
@@ -31,12 +47,24 @@ async def cost_summary(db: AsyncSession = Depends(get_db)):
     ).one()
     (n_queries, total_cost, in_tok, out_tok, avg_cost, avg_latency, n_calls) = totals
 
+    # How many of those query-costs were simulated (no GPU billed)? Lets the
+    # dashboard be honest about whether the spend shown is real or modelled.
+    n_mocked = (
+        await db.execute(
+            select(func.count(QueryCost.id)).where(QueryCost.mocked.is_(True))
+        )
+    ).scalar_one()
+
+    # Break-even: how many queries/month before per-query cost beats the sub.
     sub = s.subscription_comparison_usd_month
     avg_cost_f = float(avg_cost)
     break_even_queries = (sub / avg_cost_f) if avg_cost_f > 0 else None
 
     return {
         "n_queries": int(n_queries),
+        "n_mocked": int(n_mocked),
+        "all_mocked": int(n_mocked) == int(n_queries) and int(n_queries) > 0,
+        "any_mocked": int(n_mocked) > 0,
         "total_cost_usd": round(float(total_cost), 6),
         "total_input_tokens": int(in_tok),
         "total_output_tokens": int(out_tok),
@@ -118,6 +146,7 @@ async def cost_by_tier(db: AsyncSession = Depends(get_db)):
 
 @router.get("/timeline")
 async def cost_timeline(db: AsyncSession = Depends(get_db)):
+    # bucket by calendar day (UTC). func.date works on both sqlite & postgres.
     rows = (
         await db.execute(
             select(
@@ -132,11 +161,7 @@ async def cost_timeline(db: AsyncSession = Depends(get_db)):
     ).all()
     return {
         "timeline": [
-            {
-                "day": str(r[0]),
-                "n_queries": int(r[1]),
-                "cost_usd": round(float(r[2]), 6),
-            }
+            {"day": str(r[0]), "n_queries": int(r[1]), "cost_usd": round(float(r[2]), 6)}
             for r in rows
         ]
     }
@@ -162,6 +187,7 @@ async def recent_queries(limit: int = 25, db: AsyncSession = Depends(get_db)):
                 "n_inference_calls": c.n_inference_calls,
                 "total_cost_usd": round(c.total_cost_usd, 6),
                 "total_latency_ms": c.total_latency_ms,
+                "mocked": c.mocked,
                 "created_at": q.created_at.isoformat(),
             }
             for q, c in rows

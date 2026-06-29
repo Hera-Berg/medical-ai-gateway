@@ -1,3 +1,18 @@
+"""
+Inference orchestrator — executes a thinking tier and produces the full result:
+the final answer, the ordered trace_events (retrieval + inference passes), and
+the cost roll-up. Persisted by the query router.
+
+Step 11 implements the LOW tier (one retrieval + one inference pass). The class
+is structured so Medium/High (step 12) slot in as more passes over the same
+machinery — each pass appends a retrieval event (if it retrieves) then an
+inference event, in order.
+
+The prompt is built to be GROUNDED and HONEST: it instructs the model to answer
+only from the retrieved context, to cite which corpus each fact came from, and
+to defer to a clinician — consistent with the "not medical advice" framing and
+the provenance-across-the-trust-boundary purpose.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -33,7 +48,7 @@ class TracePass:
 @dataclass
 class OrchestratorResult:
     final_answer: str
-    events: list[object] = field(default_factory=list)
+    events: list[object] = field(default_factory=list)  # ordered TraceRetrieval|TracePass
     n_inference_calls: int = 0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
@@ -92,7 +107,10 @@ class Orchestrator:
         for plan in plans:
             items: list[RetrievedItem] = []
             if plan.retrieves:
-
+                # Reframe the retrieval query for this pass's role, so a later
+                # pass (e.g. challenge) can surface evidence the earlier pass
+                # missed. The trace records the ACTUAL query used, so the
+                # thinking panel shows what each pass searched for.
                 retrieval_query = plan.query_transform(question)
                 items = await self._retriever.retrieve(
                     query_text=retrieval_query,
@@ -107,6 +125,8 @@ class Orchestrator:
                 )
                 seq += 1
             else:
+                # Non-retrieving pass (e.g. High-tier final polish): reuse the
+                # most recent retrieved context so it still reasons over evidence.
                 items = last_items
 
             prompt = self._build_prompt(
@@ -115,9 +135,7 @@ class Orchestrator:
                 context=_format_context(items),
                 prior=last_output,
             )
-            inf: InferenceResult = await self._client.generate(
-                model=model, prompt=prompt
-            )
+            inf: InferenceResult = await self._client.generate(model=model, prompt=prompt)
             cost = call_cost_usd(model, inf)
 
             result.events.append(
@@ -172,6 +190,7 @@ class Orchestrator:
                 "Rigorously check each claim against the context. Flag unsupported "
                 "or overstated claims."
             )
+        # reconcile
         return (
             f"{_SYSTEM}\n\n{ctx}QUESTION: {question}\n\n"
             f"Prior analysis (including critiques):\n{prior}\n\n"

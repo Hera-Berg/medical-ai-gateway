@@ -1,24 +1,62 @@
-default_model: mistral-7b
+# Model registry — maps each selectable model to its RunPod Serverless endpoint,
+# the GPU tier it runs on, the per-second billing rate, and a capability hint.
+#
+# COST MODEL: RunPod Serverless bills per SECOND of GPU compute (not per token).
+# cost = billable_seconds * per_second_usd, where billable_seconds = delayTime
+# (cold start) + executionTime reported by RunPod.
+#
+# LINEUP: an ungated size ladder — 4B → 7B → 32B — so model-switching shows a
+# real spread in cost/latency/quality. All three are UNGATED (no HuggingFace
+# access request, no HF_TOKEN needed), which avoids the gated-repo + token-
+# rotation breakage that Meta Llama models cause.
+#
+# DEPLOYING A REAL ENDPOINT:
+#   1. RunPod console → Serverless → New Endpoint → vLLM (v2.20.0) → Configure.
+#   2. Enter the model's `hf_model_id` (below) as the model name.
+#   3. GPU: 48GB (A40/L40S) for 4B/7B; 80GB (A100) for 32B.
+#   4. ALWAYS set MAX_MODEL_LEN=8192 in the worker env (prevents the KV-cache
+#      OOM crash where vLLM tries to reserve cache for the full 128k context).
+#   5. Set Idle Timeout LOW (~5s) so it scales to zero when unused = $0 idle.
+#   6. Once the worker is healthy, get the EXACT served model id (vLLM lowercases
+#      it!) with:
+#        curl -s https://api.runpod.ai/v2/<ENDPOINT_ID>/openai/v1/models \
+#          -H "Authorization: Bearer $RUNPOD_API_KEY"
+#      and put that exact string in `hf_model_id` below.
+#   7. Copy the endpoint ID into `endpoint_id`. Set RUNPOD_API_KEY in .env and
+#      MOCK_INFERENCE=0, then rebuild: docker compose up -d --build backend.
+#
+# The OpenAI-compatible worker path is used by default (RUNPOD_API_STYLE=openai).
+# Per-second rates are indicative serverless rates — override to match what you
+# actually pay; the cost dashboard reflects whatever you set here.
+
+default_model: qwen-4b
 
 models:
-  mistral-7b:
-    display_name: "Mistral 7B"
+  # ── Small/fast: tiny, cheap, fits any GPU. Good for simple lookups. ──
+  qwen-4b:
+    display_name: "Qwen3 4B"
+    hf_model_id: "REPLACE_WITH_EXACT_SERVED_ID"   # e.g. qwen/qwen3-4b-instruct-2507
     endpoint_id: "REPLACE_WITH_RUNPOD_ENDPOINT_ID"
-    gpu_tier: "RTX 4090 24GB"
+    gpu_tier: "A40 48GB"
     per_second_usd: 0.00031
     capability_hint: "Fast and cheap — good for simple lookups"
     context_window: 8192
 
-  llama3-8b:
-    display_name: "Llama 3 8B"
-    endpoint_id: "REPLACE_WITH_RUNPOD_ENDPOINT_ID"
-    gpu_tier: "A100 40GB"
-    per_second_usd: 0.00044
+  # ── Medium: the proven, smooth one. Already deployed & working. ──
+  mistral-7b:
+    display_name: "Mistral 7B"
+    hf_model_id: "mistralai/mistral-7b-instruct-v0.3"
+    endpoint_id: "REPLACE_WITH_YOUR_WORKING_MISTRAL_ENDPOINT_ID"
+    gpu_tier: "A40 48GB"
+    per_second_usd: 0.00031
     capability_hint: "Balanced — solid general clinical reasoning"
     context_window: 8192
 
-  llama3-70b:
-    display_name: "Llama 3 70B"
+  # ── Large/strong: 32B fits an 80GB card comfortably (no quantization needed),
+  #    genuinely stronger reasoning, pricier per second. ──
+  qwen-32b:
+    display_name: "Qwen2.5 32B"
+    hf_model_id: "REPLACE_WITH_EXACT_SERVED_ID"   # e.g. qwen/qwen2.5-32b-instruct
     endpoint_id: "REPLACE_WITH_RUNPOD_ENDPOINT_ID"
     gpu_tier: "A100 80GB"
     per_second_usd: 0.00053

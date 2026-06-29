@@ -2,9 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Medical AI Gateway — design tokens.
+  Aesthetic: clinical precision, editorial clarity. Calm, legible, trustworthy.
+  The corpus-type distinction (authoritative vs personal) is a FIRST-CLASS
+  visual signal that recurs everywhere — it's the product's identity.
+*/
 :root {
   color-scheme: light;
 
+  /* Neutrals — warm-cool slate, not pure grey (less sterile, more considered) */
   --bg: #f7f8fa;
   --surface: #ffffff;
   --surface-2: #f1f3f6;
@@ -14,17 +21,22 @@
   --ink-soft: #556573;
   --ink-mute: #8a93a3;
 
+  /* Brand — deep teal-ink, medical without being cliché hospital-blue */
   --brand: #0f6e6e;
   --brand-soft: #e6f2f1;
   --brand-ink: #0a4f4f;
 
+  /* CORPUS IDENTITY — the load-bearing colours of the whole app */
+  /* authoritative = published literature: an authoritative indigo */
   --authoritative: #3a4db8;
   --authoritative-soft: #eaecf9;
   --authoritative-ink: #28368a;
+  /* personal = the user's own record: a distinct warm amber-bronze */
   --personal: #b5731a;
   --personal-soft: #fbf0df;
   --personal-ink: #8a5612;
 
+  /* States */
   --ok: #1f8a5b;
   --warn: #b54708;
   --danger: #b42318;
@@ -32,15 +44,11 @@
 
   --radius: 10px;
   --radius-sm: 7px;
-  --shadow-sm:
-    0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.04);
-  --shadow-md:
-    0 4px 12px rgba(16, 24, 40, 0.06), 0 2px 6px rgba(16, 24, 40, 0.04);
+  --shadow-sm: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.04);
+  --shadow-md: 0 4px 12px rgba(16,24,40,.06), 0 2px 6px rgba(16,24,40,.04);
 }
 
-* {
-  border-color: var(--border);
-}
+* { border-color: var(--border); }
 
 body {
   background: var(--bg);
@@ -49,43 +57,26 @@ body {
   font-feature-settings: "ss01", "cv01";
 }
 
+/* Subtle paper-grain atmosphere rather than a flat fill */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background-image: radial-gradient(
-    circle at 1px 1px,
-    rgba(16, 24, 40, 0.018) 1px,
-    transparent 0
-  );
+  background-image: radial-gradient(circle at 1px 1px, rgba(16,24,40,.018) 1px, transparent 0);
   background-size: 22px 22px;
 }
 
+/* Ingestion progress shimmer — the one place motion earns its keep */
 @keyframes pulse-stage {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.45;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: .45; }
 }
-.stage-active {
-  animation: pulse-stage 1.1s ease-in-out infinite;
-}
+.stage-active { animation: pulse-stage 1.1s ease-in-out infinite; }
 
 @keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.fade-up {
-  animation: fade-up 0.3s ease-out both;
-}
+.fade-up { animation: fade-up .3s ease-out both; }

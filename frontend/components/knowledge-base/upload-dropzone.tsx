@@ -1,16 +1,22 @@
 "use client";
 
+/**
+ * UploadDropzone — drag-and-drop PDF upload with the staged progress indicator
+ * the spec calls for ("Chunking… Embedding… Storing… Done").
+ *
+ * The backend pipeline is synchronous (one POST returns the finished Document),
+ * so we can't get true per-stage server events without SSE/websockets — that's
+ * a deliberate later enhancement. For now we drive the stage display
+ * OPTIMISTICALLY on a timer while the request is in flight, then snap to "done"
+ * (or "error") on the real response. The stages shown match the real pipeline
+ * order, so it's an honest representation of what's happening, just not
+ * server-confirmed per step. (Noted so we don't pretend it's live telemetry.)
+ */
 import { useCallback, useRef, useState } from "react";
 import { api, type Document } from "@/lib/api";
 import { Button, Spinner, cn } from "@/components/ui/primitives";
 
-const STAGES = [
-  "Storing",
-  "Parsing",
-  "Chunking",
-  "Embedding",
-  "Indexing",
-] as const;
+const STAGES = ["Storing", "Parsing", "Chunking", "Embedding", "Indexing"] as const;
 
 export function UploadDropzone({
   collectionId,
@@ -42,6 +48,7 @@ export function UploadDropzone({
       setError(null);
       setBusy(true);
       setStageIdx(0);
+      // advance through stages optimistically while the POST is in flight
       timer.current = setInterval(() => {
         setStageIdx((i) => Math.min(i + 1, STAGES.length - 1));
       }, 600);
@@ -62,7 +69,7 @@ export function UploadDropzone({
         setStageIdx(0);
       }
     },
-    [collectionId, sourceVersion, onUploaded],
+    [collectionId, sourceVersion, onUploaded]
   );
 
   return (
@@ -94,7 +101,7 @@ export function UploadDropzone({
           dragOver
             ? "border-brand bg-brand-soft"
             : "border-border-strong bg-surface-2 hover:border-brand/60",
-          (disabled || busy) && "cursor-not-allowed opacity-70",
+          (disabled || busy) && "cursor-not-allowed opacity-70"
         )}
       >
         <input
@@ -134,7 +141,7 @@ export function UploadDropzone({
                     "rounded-sm px-2 py-1 text-xs transition-colors",
                     i < stageIdx && "bg-brand-soft text-brand-ink",
                     i === stageIdx && "stage-active bg-brand text-white",
-                    i > stageIdx && "bg-surface text-ink-mute",
+                    i > stageIdx && "bg-surface text-ink-mute"
                   )}
                 >
                   {s}

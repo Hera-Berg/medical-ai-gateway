@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Admin — operational internals: Qdrant cluster topology + per-collection shard
+ * placement (the distributed architecture, made visible), and Postgres stats.
+ *
+ * The single-host caveat is shown prominently — this demonstrates distributed
+ * topology, not real fault tolerance. Honesty over impressiveness.
+ */
 import { useEffect, useState } from "react";
 import { api, type AdminCluster, type AdminDatabase } from "@/lib/api";
 import { Card, Spinner } from "@/components/ui/primitives";
@@ -49,23 +56,15 @@ export default function AdminPage() {
             {cluster?.cluster?.peer_count ? (
               <div className="mb-4 flex flex-wrap gap-3">
                 <Mini label="Status" value={cluster.cluster.status ?? "—"} />
-                <Mini
-                  label="Nodes (peers)"
-                  value={String(cluster.cluster.peer_count)}
-                />
+                <Mini label="Nodes (peers)" value={String(cluster.cluster.peer_count)} />
                 <Mini
                   label="This peer"
-                  value={
-                    cluster.cluster.peer_id
-                      ? `#${cluster.cluster.peer_id}`
-                      : "—"
-                  }
+                  value={cluster.cluster.peer_id ? `#${cluster.cluster.peer_id}` : "—"}
                 />
               </div>
             ) : (
               <p className="mb-4 text-sm text-ink-mute">
-                Cluster API not reachable (single-node dev, or cluster not
-                formed).
+                Cluster API not reachable (single-node dev, or cluster not formed).
               </p>
             )}
 
@@ -96,34 +95,26 @@ export default function AdminPage() {
                       shards: <strong>{c.shard_number ?? "—"}</strong>
                     </span>
                     <span>
-                      replication:{" "}
-                      <strong>{c.replication_factor ?? "—"}×</strong>
+                      replication: <strong>{c.replication_factor ?? "—"}×</strong>
                     </span>
-                    {c.shards?.local_shards &&
-                      c.shards.local_shards.length > 0 && (
-                        <span>
-                          local shards on this peer:{" "}
-                          <strong>
-                            {c.shards.local_shards
-                              .map((s) => `#${s.shard_id} (${s.state})`)
-                              .join(", ")}
-                          </strong>
-                        </span>
-                      )}
-                    {c.shards?.remote_shards &&
-                      c.shards.remote_shards.length > 0 && (
-                        <span>
-                          remote shards:{" "}
-                          <strong>
-                            {c.shards.remote_shards
-                              .map(
-                                (s) =>
-                                  `#${s.shard_id}→peer ${s.peer_id} (${s.state})`,
-                              )
-                              .join(", ")}
-                          </strong>
-                        </span>
-                      )}
+                    {c.shards?.local_shards && c.shards.local_shards.length > 0 && (
+                      <span>
+                        local shards on this peer:{" "}
+                        <strong>
+                          {c.shards.local_shards.map((s) => `#${s.shard_id} (${s.state})`).join(", ")}
+                        </strong>
+                      </span>
+                    )}
+                    {c.shards?.remote_shards && c.shards.remote_shards.length > 0 && (
+                      <span>
+                        remote shards:{" "}
+                        <strong>
+                          {c.shards.remote_shards
+                            .map((s) => `#${s.shard_id}→peer ${s.peer_id} (${s.state})`)
+                            .join(", ")}
+                        </strong>
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -142,11 +133,7 @@ export default function AdminPage() {
               <>
                 <div className="flex flex-wrap gap-3">
                   {Object.entries(database.row_counts).map(([table, n]) => (
-                    <Mini
-                      key={table}
-                      label={table}
-                      value={n.toLocaleString()}
-                    />
+                    <Mini key={table} label={table} value={n.toLocaleString()} />
                   ))}
                   {database.database_size && (
                     <Mini label="DB size" value={database.database_size} />
@@ -159,9 +146,7 @@ export default function AdminPage() {
                 </p>
               </>
             ) : (
-              <p className="text-sm text-ink-mute">
-                Database stats unavailable.
-              </p>
+              <p className="text-sm text-ink-mute">Database stats unavailable.</p>
             )}
           </Card>
         </>

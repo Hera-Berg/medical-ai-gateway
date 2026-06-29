@@ -1,22 +1,45 @@
+"""
+RAG Inspector router — the developer/diagnostic surface.
+
+Endpoints:
+  GET  /inspector/overview
+        Per-collection + global chunk/vector counts.
+  GET  /inspector/collections/{collection_id}/chunks
+        Every chunk in a collection (text, index, page, provenance) WITH its
+        embedding vector pulled from Qdrant — for the expandable chunk view and
+        the truncated-vector / copy-full-vector display.
+  POST /inspector/dry-run
+        Live similarity search: embed a query, return ranked chunks with scores
+        and provenance. NO LLM is called — this is pure retrieval, exactly what
+        the inspector's "live RAG dry-run" needs.
+  GET  /inspector/collections/{collection_id}/scatter
+        Server-side PCA -> 2D coords per chunk (+ text/provenance for hover),
+        for the similarity scatter plot.
+
+All read-only and side-effect-free; safe to hammer from the UI.
+"""
 from __future__ import annotations
 
 import uuid
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Chunk, Collection, Document
 from app.db.session import get_db
 from app.rag.qdrant_client import QdrantRAG
 from app.rag.reducer import reduce_to_2d
 from app.rag.retriever import Retriever
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/inspector", tags=["inspector"])
 
 
+# ── overview ────────────────────────────────────────────────────────────────
 @router.get("/overview")
 async def overview(db: AsyncSession = Depends(get_db)):
+    """Per-collection and global chunk/vector counts."""
     collections = (await db.execute(select(Collection))).scalars().all()
     qdrant = QdrantRAG()
 
@@ -24,6 +47,7 @@ async def overview(db: AsyncSession = Depends(get_db)):
     global_chunks = 0
     global_vectors = 0
     for c in collections:
+        # chunk count from PG
         n_chunks = len(
             (
                 await db.execute(
@@ -35,6 +59,7 @@ async def overview(db: AsyncSession = Depends(get_db)):
             .scalars()
             .all()
         )
+        # vector count from Qdrant (source of truth for what's indexed)
         try:
             stats = await qdrant.collection_stats(c.qdrant_collection)
             n_vectors = stats["points_count"] or 0
@@ -60,10 +85,12 @@ async def overview(db: AsyncSession = Depends(get_db)):
     }
 
 
+# ── chunks with vectors ─────────────────────────────────────────────────────
 @router.get("/collections/{collection_id}/chunks")
 async def collection_chunks(
     collection_id: uuid.UUID, db: AsyncSession = Depends(get_db)
 ):
+    """Every chunk in the collection, grouped by document, each with its vector."""
     coll = await db.get(Collection, collection_id)
     if coll is None:
         raise HTTPException(status_code=404, detail="collection not found")
@@ -94,6 +121,7 @@ async def collection_chunks(
             .scalars()
             .all()
         )
+        # pull vectors for all this doc's points in one call
         point_ids = [str(ch.qdrant_point_id) for ch in chunks]
         vectors = await qdrant.get_vectors_by_point_ids(
             collection=coll.qdrant_collection, point_ids=point_ids
@@ -109,7 +137,7 @@ async def collection_chunks(
                     "page_number": ch.page_number,
                     "section": ch.section,
                     "token_count": ch.token_count,
-                    "vector": vec,
+                    "vector": vec,           # full vector (frontend truncates display)
                     "vector_dim": len(vec) if vec else None,
                 }
             )
@@ -133,14 +161,17 @@ async def collection_chunks(
     }
 
 
+# ── dry-run search (no LLM) ─────────────────────────────────────────────────
 class DryRunRequest(BaseModel):
     query: str
-    collection_ids: list[uuid.UUID] | None = None
+    collection_ids: list[uuid.UUID] | None = None  # None = all collections
     limit: int = 8
 
 
 @router.post("/dry-run")
 async def dry_run(body: DryRunRequest, db: AsyncSession = Depends(get_db)):
+    """Embed the query and return ranked chunks with scores — no LLM call."""
+    # Resolve scope -> qdrant collection names.
     stmt = select(Collection)
     if body.collection_ids:
         stmt = stmt.where(Collection.id.in_(body.collection_ids))
@@ -171,8 +202,10 @@ async def dry_run(body: DryRunRequest, db: AsyncSession = Depends(get_db)):
     }
 
 
+# ── scatter (server-side PCA) ───────────────────────────────────────────────
 @router.get("/collections/{collection_id}/scatter")
 async def scatter(collection_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """PCA-project all chunk vectors to 2D for the similarity scatter plot."""
     coll = await db.get(Collection, collection_id)
     if coll is None:
         raise HTTPException(status_code=404, detail="collection not found")
@@ -203,11 +236,7 @@ async def scatter(collection_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         )
 
     return {
-        "collection": {
-            "id": str(coll.id),
-            "name": coll.name,
-            "corpus_type": coll.corpus_type.value,
-        },
+        "collection": {"id": str(coll.id), "name": coll.name, "corpus_type": coll.corpus_type.value},
         "method": "pca",
         "point_count": len(out),
         "points": out,

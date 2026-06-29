@@ -1,7 +1,26 @@
+"""
+Ingestion service — orchestrates the full upload pipeline:
+
+    store bytes (StorageBackend)
+      -> parse (FileHandler -> ParsedDocument)
+      -> chunk (Chunker -> ChunkRecords)
+      -> embed (Embedder, passage prefix)
+      -> index (QdrantRAG.upsert with provenance payloads)
+      -> persist (Document + Chunk rows in Postgres)
+
+It reports progress through the stages the UI shows ("Chunking… Embedding…
+Storing… Done") via an optional callback, and returns the created Document id +
+chunk count.
+
+This is deliberately a single cohesive unit so the order and the transactional
+boundaries are in one readable place, rather than scattered across the router.
+"""
 from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Chunk, Collection, Document
 from app.ingestion.chunker import Chunker
@@ -9,7 +28,6 @@ from app.ingestion.handlers.registry import get_handler_for
 from app.rag.embedder import Embedder
 from app.rag.qdrant_client import QdrantRAG
 from app.storage.base import StorageBackend
-from sqlalchemy.ext.asyncio import AsyncSession
 
 ProgressCb = Callable[[str], None] | None
 
@@ -44,23 +62,28 @@ class IngestionService:
             if progress:
                 progress(stage)
 
+        # 1. STORE raw bytes via the active backend.
         _emit("storing")
         stored = await self._storage.store_file(
             data=data, filename=filename, collection_id=str(collection.id)
         )
 
+        # 2. PARSE -> pages.
         _emit("parsing")
         handler = get_handler_for(filename)
         parsed = handler.extract(data=data, filename=filename)
 
+        # 3. CHUNK.
         _emit("chunking")
         chunk_records = self._chunker.chunk(parsed)
         if not chunk_records:
             raise ValueError(f"No extractable text in {filename!r}")
 
+        # 4. EMBED (passage prefix) — batch all chunks at once.
         _emit("embedding")
         vectors = self._embedder.embed_passages([c.text for c in chunk_records])
 
+        # 5. Persist Document + Chunk rows; build Qdrant points with provenance.
         _emit("indexing")
         document = Document(
             id=uuid.uuid4(),
@@ -104,6 +127,7 @@ class IngestionService:
                 }
             )
 
+        # 6. INDEX into Qdrant (ensure collection exists first).
         await self._qdrant.ensure_collection(collection.qdrant_collection)
         await self._qdrant.upsert_chunks(
             collection=collection.qdrant_collection,

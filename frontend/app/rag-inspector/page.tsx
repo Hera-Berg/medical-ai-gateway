@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * RAG Inspector — the developer/diagnostic page. Explicitly labelled as such.
+ * Surfaces the retrieval internals: counts, a live no-LLM similarity dry-run,
+ * the PCA scatter of the vector space, and a full chunk+vector browser.
+ *
+ * Everything here reads the same retrieval pipeline the chat will use, so it's a
+ * faithful diagnostic — not a separate mock.
+ */
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
@@ -21,6 +29,7 @@ export default function RagInspectorPage() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // dry-run search
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<DryRunResult | null>(null);
@@ -69,15 +78,15 @@ export default function RagInspectorPage() {
     if (!query.trim()) return;
     setSearching(true);
     try {
-      setResults(await api.inspectorDryRun({ query: query.trim(), limit: 8 }));
+      setResults(
+        await api.inspectorDryRun({ query: query.trim(), limit: 8 })
+      );
     } finally {
       setSearching(false);
     }
   };
 
-  const selectedCollection = overview?.collections.find(
-    (c) => c.id === selectedId,
-  );
+  const selectedCollection = overview?.collections.find((c) => c.id === selectedId);
   const accentVar =
     selectedCollection?.corpus_type === "personal"
       ? "--personal"
@@ -116,7 +125,11 @@ export default function RagInspectorPage() {
             <Stat label="Collections" value={overview.collections.length} />
             <Stat label="Total chunks" value={overview.global_chunk_count} />
             <Stat label="Total vectors" value={overview.global_vector_count} />
-            <Stat label="Vector dims" value={384} hint="bge-small-en-v1.5" />
+            <Stat
+              label="Vector dims"
+              value={384}
+              hint="bge-small-en-v1.5"
+            />
           </div>
 
           {/* ── live dry-run search ── */}
@@ -179,7 +192,7 @@ export default function RagInspectorPage() {
                   "flex items-center gap-2 rounded border px-3 py-1.5 text-sm transition-colors",
                   selectedId === c.id
                     ? "border-brand bg-brand-soft text-brand-ink"
-                    : "border-border bg-surface hover:bg-surface-2",
+                    : "border-border bg-surface hover:bg-surface-2"
                 )}
               >
                 {c.name}
@@ -256,13 +269,9 @@ function Stat({
 }) {
   return (
     <Card className="px-4 py-3">
-      <div className="text-2xl font-semibold text-ink">
-        {value.toLocaleString()}
-      </div>
+      <div className="text-2xl font-semibold text-ink">{value.toLocaleString()}</div>
       <div className="text-xs text-ink-mute">{label}</div>
-      {hint && (
-        <div className="mt-0.5 font-mono text-[10px] text-ink-mute">{hint}</div>
-      )}
+      {hint && <div className="mt-0.5 font-mono text-[10px] text-ink-mute">{hint}</div>}
     </Card>
   );
 }
