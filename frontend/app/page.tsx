@@ -66,7 +66,7 @@ export default function ChatPage() {
 
   const sessionCost = turns.reduce(
     (sum, t) => sum + (t.response?.cost.total_cost_usd ?? 0),
-    0
+    0,
   );
 
   const ask = useCallback(async () => {
@@ -84,15 +84,15 @@ export default function ChatPage() {
       });
       setTurns((t) =>
         t.map((turn, i) =>
-          i === t.length - 1 ? { ...turn, response: res } : turn
-        )
+          i === t.length - 1 ? { ...turn, response: res } : turn,
+        ),
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setTurns((t) =>
         t.map((turn, i) =>
-          i === t.length - 1 ? { ...turn, error: msg } : turn
-        )
+          i === t.length - 1 ? { ...turn, error: msg } : turn,
+        ),
       );
     } finally {
       setBusy(false);
@@ -161,8 +161,19 @@ export default function ChatPage() {
         <div className="mb-2">
           <h1 className="font-display text-3xl font-semibold text-ink">Chat</h1>
           <p className="text-sm text-ink-soft">
-            Ask across your corpora — provenance shown for every retrieved
-            passage.
+            The first message may take up to <strong>3 minutes</strong>to load
+            because the system needs to find an available GPU to rent and load
+            the model weights before generating a response. This delay exists
+            due to financial constraints, as keeping a GPU running 24/7 is not
+            feasible for a portfolio project.
+            <br />
+            <br />
+            In a production environment, the model would run on a readily
+            available GPU or a warm server, reducing the first-message wait time
+            to only a few seconds. There is also a chance the first message may
+            return a <strong>524</strong> error due to timeout. This is
+            expected; simply send the message again, and it should respond much
+            faster the second time.
           </p>
         </div>
 
@@ -231,7 +242,10 @@ export default function ChatPage() {
                         cost ${turn.response.cost.total_cost_usd.toFixed(5)}
                       </span>
                       <span>
-                        {(turn.response.cost.total_latency_ms / 1000).toFixed(1)}s
+                        {(turn.response.cost.total_latency_ms / 1000).toFixed(
+                          1,
+                        )}
+                        s
                       </span>
                       <span>
                         {turn.response.cost.n_inference_calls} inference{" "}
@@ -266,7 +280,10 @@ export default function ChatPage() {
             rows={2}
             className="flex-1 resize-none rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-brand disabled:opacity-50"
           />
-          <Button onClick={ask} disabled={busy || noCorpora || !question.trim()}>
+          <Button
+            onClick={ask}
+            disabled={busy || noCorpora || !question.trim()}
+          >
             {busy ? <Spinner /> : "Send"}
           </Button>
         </div>
