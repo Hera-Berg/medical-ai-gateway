@@ -161,7 +161,7 @@ export default function ChatPage() {
         <div className="mb-2">
           <h1 className="font-display text-3xl font-semibold text-ink">Chat</h1>
           <p className="text-sm text-ink-soft">
-            The first message may take up to <strong>3 minutes</strong>to load
+            The first message may take up to <strong>3 minutes</strong> to load
             because the system needs to find an available GPU to rent and load
             the model weights before generating a response. This delay exists
             due to financial constraints, as keeping a GPU running 24/7 is not
@@ -189,7 +189,7 @@ export default function ChatPage() {
                   first.
                 </>
               ) : (
-                "Ask a question to begin. Try: “What is the HbA1c target for type 2 diabetes?”"
+                "Scroll down to the chat input and ask a question to get started. Try: “What is the HbA1c target for type 2 diabetes?”"
               )}
             </Card>
           )}

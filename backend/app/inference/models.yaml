@@ -35,7 +35,7 @@ models:
   # ── Small/fast: tiny, cheap, fits any GPU. Good for simple lookups. ──
   qwen-4b:
     display_name: "Qwen3 4B"
-    hf_model_id: "REPLACE_WITH_EXACT_SERVED_ID"   # e.g. qwen/qwen3-4b-instruct-2507
+    hf_model_id: "qwen/qwen3-4b-instruct-2507-fp8" # e.g. qwen/qwen3-4b-instruct-2507
     endpoint_id: "REPLACE_WITH_RUNPOD_ENDPOINT_ID"
     gpu_tier: "A40 48GB"
     per_second_usd: 0.00031
@@ -46,7 +46,7 @@ models:
   mistral-7b:
     display_name: "Mistral 7B"
     hf_model_id: "mistralai/mistral-7b-instruct-v0.3"
-    endpoint_id: "REPLACE_WITH_YOUR_WORKING_MISTRAL_ENDPOINT_ID"
+    endpoint_id: "REPLACE_WITH_RUNPOD_ENDPOINT_ID"
     gpu_tier: "A40 48GB"
     per_second_usd: 0.00031
     capability_hint: "Balanced — solid general clinical reasoning"
@@ -55,10 +55,10 @@ models:
   # ── Large/strong: 32B fits an 80GB card comfortably (no quantization needed),
   #    genuinely stronger reasoning, pricier per second. ──
   qwen-32b:
-    display_name: "Qwen2.5 32B"
-    hf_model_id: "REPLACE_WITH_EXACT_SERVED_ID"   # e.g. qwen/qwen2.5-32b-instruct
+    display_name: "Qwen3 30B-A3B"
+    hf_model_id: "qwen/qwen3-30b-a3b-instruct-2507-fp8"
     endpoint_id: "REPLACE_WITH_RUNPOD_ENDPOINT_ID"
     gpu_tier: "A100 80GB"
     per_second_usd: 0.00053
-    capability_hint: "Best for complex clinical reasoning — slower, pricier"
+    capability_hint: "Large MoE — strong reasoning, ~3B active params"
     context_window: 8192

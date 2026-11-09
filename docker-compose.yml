@@ -1,25 +1,27 @@
 # ════════════════════════════════════════════════════════════════════════════
 # Medical AI Gateway — full stack, single `docker-compose up`.
 #
-# Services (7):
+# Services (6):
 #   1. nginx         reverse proxy + load balancer (the only ingress)
-#   2. cloudflared   Cloudflare tunnel → points at nginx (zero open host ports)
-#   3. frontend      Next.js 14
-#   4. backend       FastAPI (STATELESS — scale via deploy.replicas)
-#   5. qdrant-node1  distributed vector DB, peer 1 (bootstrap)
-#   6. qdrant-node2  distributed vector DB, peer 2 (joins node1)
-#   7. postgres      metadata, query logs, costs, app_config (SINGLE instance)
+#   2. frontend      Next.js 14
+#   3. backend       FastAPI (STATELESS — scale via deploy.replicas)
+#   4. qdrant-node1  distributed vector DB, peer 1 (bootstrap)
+#   5. qdrant-node2  distributed vector DB, peer 2 (joins node1)
+#   6. postgres      metadata, query logs, costs, app_config (SINGLE instance)
 #
-# At scaffold stage everything is real and runnable; feature code arrives in
-# later build steps. The point of this file is to let you run it and confirm
-# the topology — especially that Qdrant forms a 2-node cluster.
+# Reached from the internet via the POSTER SITE's tunnel + glue server
+# (Model A): medical.heraberg.com → glue server → http://127.0.0.1:8002 (nginx).
+# This stack does not run its own tunnel.
 # ════════════════════════════════════════════════════════════════════════════
 
 services:
   # ──────────────────────────────────────────────────────────────────────────
-  # 1. NGINX — single ingress. Cloudflare tunnel points here. No host ports
-  #    published in production; we expose 8090 on localhost ONLY for local dev
-  #    so you can hit http://localhost:8090 before configuring the tunnel.
+  # 1. NGINX — single ingress for THIS stack. Published on 127.0.0.1:8002 so the
+  #    poster site's glue server (running on the same laptop) proxies
+  #    medical.heraberg.com → http://127.0.0.1:8002. The glue server provides the
+  #    password gate (project marked gated:true), so this stack's own Basic Auth
+  #    is left OFF here — DON'T set GATEWAY_PASSWORD in .env, or you'll get two
+  #    prompts. The auth files stay in infra/nginx/ but stay dormant while empty.
   # ──────────────────────────────────────────────────────────────────────────
   nginx:
     build: ./infra/nginx
@@ -27,34 +29,24 @@ services:
       - frontend
       - backend
     ports:
-      - "127.0.0.1:8090:80" # local-dev convenience; remove for tunnel-only prod
-    restart: unless-stopped
-
-  # ──────────────────────────────────────────────────────────────────────────
-  # 2. CLOUDFLARED — outbound tunnel to Cloudflare edge. Routes public traffic
-  #    to nginx:80 over the internal Docker network. No inbound ports on host.
-  #    Token comes from .env. Until you set a real token, this service will
-  #    fail to connect — that's expected and does NOT block the rest of the
-  #    stack. See docs/cloudflare-tunnel.md.
-  # ──────────────────────────────────────────────────────────────────────────
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    # Remotely-managed tunnel: all routing (which public hostname → which
-    # internal service) is configured in the Cloudflare dashboard, not here.
-    # This container just needs the tunnel TOKEN. It reaches nginx by service
-    # name over the shared Docker network. Public hostname should map to
-    # http://nginx:80 in the dashboard. See docs/cloudflare-tunnel.md.
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    profiles:
-      - tunnel # dormant in normal dev; start with: docker compose --profile tunnel up
+      - "127.0.0.1:8002:80" # glue server proxies medical.heraberg.com → here
     environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      - nginx
+      # Read by infra/nginx/00-gateway-auth.sh. Empty password = auth OFF
+      # (the poster's glue server is the gate). Set a password only if you ever
+      # run this stack standalone without the glue server in front.
+      - GATEWAY_USER=${GATEWAY_USER:-recruiter}
+      - GATEWAY_PASSWORD=${GATEWAY_PASSWORD:-}
     restart: unless-stopped
 
   # ──────────────────────────────────────────────────────────────────────────
-  # 3. FRONTEND — Next.js 14. Talks to backend only through Nginx in prod; the
+  # (Cloudflared removed.) This stack no longer runs its own tunnel — the
+  # poster site's single Cloudflare tunnel reaches it via the glue server
+  # (Model A). If you ever want to run this stack standalone with its own
+  # public tunnel again, re-add a cloudflared service pointing at nginx:80.
+  # ──────────────────────────────────────────────────────────────────────────
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 2. FRONTEND — Next.js 14. Talks to backend only through Nginx in prod; the
   #    BACKEND_URL rewrite is a dev convenience.
   # ──────────────────────────────────────────────────────────────────────────
   frontend:
@@ -64,7 +56,7 @@ services:
     restart: unless-stopped
 
   # ──────────────────────────────────────────────────────────────────────────
-  # 4. BACKEND — FastAPI. STATELESS. Scale horizontally by bumping replicas:
+  # 3. BACKEND — FastAPI. STATELESS. Scale horizontally by bumping replicas:
   #
   #        docker compose up -d --scale backend=3
   #
@@ -85,7 +77,7 @@ services:
       - ACTIVE_STORAGE_BACKEND_DEFAULT=local
       - RUN_MIGRATIONS=1
       # Inference: mock by default ($0 dev). Set to 0 with real RunPod endpoints.
-      - MOCK_INFERENCE=1
+      - MOCK_INFERENCE=0
       # LocalStorageBackend writes uploaded PDFs here (backed by a volume).
       - LOCAL_PDF_STORAGE_PATH=/data/pdfs
       # AWS vars only read when AWS backend is active:
@@ -109,7 +101,7 @@ services:
     # swarm mode; documented in README.
 
   # ──────────────────────────────────────────────────────────────────────────
-  # 5. + 6. QDRANT DISTRIBUTED CLUSTER (2 nodes)
+  # 4. + 5. QDRANT DISTRIBUTED CLUSTER (2 nodes)
   #
   #   Cluster formation:
   #     - node1 bootstraps the cluster (--uri points at itself).
@@ -153,7 +145,7 @@ services:
     restart: unless-stopped
 
   # ──────────────────────────────────────────────────────────────────────────
-  # 7. POSTGRESQL — SINGLE instance. This is the documented scaling bottleneck
+  # 6. POSTGRESQL — SINGLE instance. This is the documented scaling bottleneck
   #    (see docs/scaling.md: production → managed RDS + read replicas).
   # ──────────────────────────────────────────────────────────────────────────
   postgres:
